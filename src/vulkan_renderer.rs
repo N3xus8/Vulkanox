@@ -3,15 +3,14 @@
 use std::{default, sync::Arc, u32};
 
 use vulkano::{
-    image::{view::ImageView, Image, ImageUsage},
-    pipeline::graphics::viewport::Viewport,
-    swapchain::{Surface, Swapchain, SwapchainCreateInfo},
+    device::DeviceOwned, image::{view::ImageView, Image, ImageUsage}, pipeline::graphics::viewport::Viewport, swapchain::{Surface, Swapchain, SwapchainCreateInfo}
 };
 use winit::window::Window;
 
 use crate::{error::Result, vulkan_device::VulkanDevice};
 
 pub struct VulkanRenderer {
+    pub window: Arc<Window>,
     pub swapchain: Arc<Swapchain>,
     pub swapchain_images: Vec<Arc<Image>>,
     pub swapchain_image_views: Vec<Arc<ImageView>>,
@@ -82,10 +81,43 @@ impl VulkanRenderer {
             window_size_dependent_setup(&swapchain_images, &mut viewport);
 
         Ok(Self {
+            window,
             swapchain,
             swapchain_images,
             swapchain_image_views,
         })
+    }
+
+
+    pub fn recreate(&mut self) -> Result<()> {
+
+        
+            let surface_capabilities =
+            self.swapchain.device().physical_device().surface_capabilities(&self.swapchain.surface(), Default::default())?;
+
+            self.swapchain_images.clear();
+            self.swapchain_image_views.clear();
+
+            let (new_swapchain, new_swapchain_images) = self.swapchain.recreate(SwapchainCreateInfo {
+                image_extent: surface_capabilities.current_extent.unwrap_or(self.window.inner_size().into()),
+                ..self.swapchain.create_info()
+            },)?;
+
+            let mut viewport = Viewport {
+                offset: [0.0, 0.0],
+                extent: [0.0, 0.0],
+                depth_range: 0.0..=1.0,
+            };
+
+            let new_swapchain_image_views =
+                window_size_dependent_setup(&new_swapchain_images, &mut viewport);
+            
+            self.swapchain = new_swapchain ;
+            self.swapchain_images = new_swapchain_images;
+            self.swapchain_image_views = new_swapchain_image_views ;
+
+            Ok(())
+    
     }
 }
 
