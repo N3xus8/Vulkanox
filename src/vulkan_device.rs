@@ -20,14 +20,14 @@ use vulkano::{
             GraphicsPipelineCreateInfo,
         },
         layout::PipelineDescriptorSetLayoutCreateInfo,
-        DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateFlags,
+        DynamicState, GraphicsPipeline, PipelineLayout,
         PipelineShaderStageCreateInfo,
     },
 };
 
 use crate::{
     error::Result,
-    shader::{self, fs, vs},
+    shader::{self, fs, vs, INDICES},
     vulkan_instance::VulkanInstance,
 };
 pub struct VulkanDevice {
@@ -36,6 +36,7 @@ pub struct VulkanDevice {
     command_allocator: Arc<StandardCommandBufferAllocator>,
     graphics_pipeline: Arc<GraphicsPipeline>,
     pub vertex_buffer: Subbuffer<[shader::Vertex]>,
+    pub index_buffer: Subbuffer<[u32]>
 }
 
 impl VulkanDevice {
@@ -95,7 +96,7 @@ impl VulkanDevice {
             Default::default(),
         ));
 
-        // Create a buffer for the Vertex: subbuffer<[Vertex]>
+        // Create a Vertex buffer  : subbuffer<[Vertex]>
 
         let vertex_buffer = Buffer::from_iter(
             memory_allocator.clone(),
@@ -110,6 +111,23 @@ impl VulkanDevice {
             },
             shader::VERTICES,
         )?;
+
+        // Create an index buffer : subbuffer<[u32]>
+
+        let index_buffer = Buffer::from_iter(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::INDEX_BUFFER,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            INDICES,
+        )?;
+
 
         // ---->
         // Graphics Pipeline - Shader
@@ -202,6 +220,7 @@ impl VulkanDevice {
             command_allocator,
             graphics_pipeline,
             vertex_buffer,
+            index_buffer,
         })
     }
 
@@ -219,5 +238,9 @@ impl VulkanDevice {
 
     pub fn graphics_pipeline(&self) -> &Arc<GraphicsPipeline> {
         &self.graphics_pipeline
+    }
+
+    pub fn index_buffer(&self) -> &Subbuffer<[u32]> {
+        &self.index_buffer
     }
 }

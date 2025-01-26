@@ -56,11 +56,11 @@ impl VulkanRenderer {
             physical_device.surface_capabilities(&surface, Default::default())?;
 
         // Choosing the internal format that the images will have.
-        let image_format = device
+       /*  let image_format = device
             .physical_device()
             .surface_formats(&surface, Default::default())
             .unwrap()[0]
-            .0;
+            .0; */
 
         // create the swapchain
 
@@ -198,7 +198,7 @@ impl VulkanRenderer {
 
         // Dynamic viewports allow us to recreate just the viewport when the window is resized.
         // Otherwise we would have to recreate the whole pipeline.
-        let mut viewport = Viewport {
+        let viewport = Viewport {
             offset: [0.0, 0.0],
             extent: [extent[0] as f32, extent[1] as f32],
             depth_range: 0.0..=1.0,
@@ -242,6 +242,7 @@ impl VulkanRenderer {
             .set_viewport(0, [viewport.clone()].into_iter().collect())?
             .bind_pipeline_graphics(Arc::clone(&self.vulkan_device.graphics_pipeline()))?
             .bind_vertex_buffers(0, self.vulkan_device.vertex_buffer.clone())?
+            .bind_index_buffer(self.vulkan_device.index_buffer().clone())?
             // We add a draw command.
             .draw(self.vulkan_device.vertex_buffer.len() as u32, 1, 0, 0)?
             // We leave the render pass.

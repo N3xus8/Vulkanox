@@ -78,3 +78,5 @@ pub const VERTICES: [Vertex; 3] = [
         position: [0.25, -0.1],
     },
 ];
+
+pub const INDICES: [u32;3] = [0, 1, 1];
