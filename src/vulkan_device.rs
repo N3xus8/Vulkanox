@@ -3,16 +3,39 @@
 use std::sync::Arc;
 
 use vulkano::{
+    buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     command_buffer::allocator::StandardCommandBufferAllocator,
     device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo},
-    memory::allocator::StandardMemoryAllocator,
+    format::Format,
+    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
+    pipeline::{
+        graphics::{
+            color_blend::{ColorBlendAttachmentState, ColorBlendState},
+            input_assembly::InputAssemblyState,
+            multisample::MultisampleState,
+            rasterization::RasterizationState,
+            subpass::PipelineRenderingCreateInfo,
+            vertex_input::{Vertex as VertexInput, VertexDefinition},
+            viewport::ViewportState,
+            GraphicsPipelineCreateInfo,
+        },
+        layout::PipelineDescriptorSetLayoutCreateInfo,
+        DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateFlags,
+        PipelineShaderStageCreateInfo,
+    },
 };
 
-use crate::{error::Result, vulkan_instance::VulkanInstance};
+use crate::{
+    error::Result,
+    shader::{self, fs, vs},
+    vulkan_instance::VulkanInstance,
+};
 pub struct VulkanDevice {
-    queue: Arc<Queue>,
+    pub queue: Arc<Queue>,
     memory_allocator: Arc<StandardMemoryAllocator>,
     command_allocator: Arc<StandardCommandBufferAllocator>,
+    graphics_pipeline: Arc<GraphicsPipeline>,
+    pub vertex_buffer: Subbuffer<[shader::Vertex]>,
 }
 
 impl VulkanDevice {
@@ -72,10 +95,113 @@ impl VulkanDevice {
             Default::default(),
         ));
 
+        // Create a buffer for the Vertex: subbuffer<[Vertex]>
+
+        let vertex_buffer = Buffer::from_iter(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::VERTEX_BUFFER,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            shader::VERTICES,
+        )?;
+
+        // ---->
+        // Graphics Pipeline - Shader
+        // ---->
+
+        let graphics_pipeline = {
+            // scope to make sure shaders are dropped once pipelines are created.
+
+            let vertex_shader = vs::load(Arc::clone(&device))?.entry_point("main").unwrap();
+            let fragment_shader = fs::load(Arc::clone(&device))?.entry_point("main").unwrap();
+
+            // Automatically generate a vertex input state from the vertex shader's input interface,
+            // that takes a single vertex buffer containing `Vertex` structs.
+            let vertex_input_state =
+                shader::Vertex::per_vertex().definition(&vertex_shader.info().input_interface)?;
+
+            let stages: [PipelineShaderStageCreateInfo; 2] = [
+                PipelineShaderStageCreateInfo::new(vertex_shader),
+                PipelineShaderStageCreateInfo::new(fragment_shader),
+            ];
+
+            // We must now create a **pipeline layout** object, which describes the locations and types of
+            // descriptor sets and push constants used by the shaders in the pipeline.
+            //
+            // Multiple pipelines can share a common layout object, which is more efficient.
+            // The shaders in a pipeline must use a subset of the resources described in its pipeline
+            // layout, but the pipeline layout is allowed to contain resources that are not present in the
+            // shaders; they can be used by shaders in other pipelines that share the same layout.
+            // Thus, it is a good idea to design shaders so that many pipelines have common resource
+            // locations, which allows them to share pipeline layouts.
+            let layout = PipelineLayout::new(
+                Arc::clone(&device),
+                // Since we only have one pipeline in this example, and thus one pipeline layout,
+                // we automatically generate the creation info for it from the resources used in the
+                // shaders. In a real application, you would specify this information manually so that you
+                // can re-use one layout in multiple pipelines.
+                PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages)
+                    .into_pipeline_layout_create_info(Arc::clone(&device))?,
+            )?;
+
+            // We describe the formats of attachment images where the colors, depth and/or stencil
+            // information will be written. The pipeline will only be usable with this particular
+            // configuration of the attachment images.
+            let subpass = PipelineRenderingCreateInfo {
+                // We specify a single color attachment that will be rendered to. When we begin
+                // rendering, we will specify a swapchain image to be used as this attachment, so here
+                // we set its format to be the same format as the swapchain.
+                color_attachment_formats: vec![Some(Format::B8G8R8A8_SRGB)], // Caution! Hard coded
+                ..Default::default()
+            };
+
+            GraphicsPipeline::new(
+                Arc::clone(&device),
+                None,
+                GraphicsPipelineCreateInfo {
+                    stages: stages.into_iter().collect(),
+                    // How vertex data is read from the vertex buffers into the vertex shader.
+                    vertex_input_state: Some(vertex_input_state),
+                    // How vertices are arranged into primitive shapes.
+                    // The default primitive shape is a triangle.
+                    input_assembly_state: Some(InputAssemblyState::default()),
+                    // How primitives are transformed and clipped to fit the framebuffer.
+                    // We use a resizable viewport, set to draw over the entire window.
+                    viewport_state: Some(ViewportState::default()),
+                    // How polygons are culled and converted into a raster of pixels.
+                    // The default value does not perform any culling.
+                    rasterization_state: Some(RasterizationState::default()),
+                    // How multiple fragment shader samples are converted to a single pixel value.
+                    // The default value does not perform any multisampling.
+                    multisample_state: Some(MultisampleState::default()),
+                    // How pixel values are combined with the values already present in the framebuffer.
+                    // The default value overwrites the old value with the new one, without any blending.
+                    color_blend_state: Some(ColorBlendState::with_attachment_states(
+                        subpass.color_attachment_formats.len() as u32,
+                        ColorBlendAttachmentState::default(),
+                    )),
+                    // Dynamic states allows us to specify parts of the pipeline settings when
+                    // recording the command buffer, before we perform drawing.
+                    // Here, we specify that the viewport should be dynamic.
+                    dynamic_state: [DynamicState::Viewport].into_iter().collect(),
+                    subpass: Some(subpass.into()),
+                    ..GraphicsPipelineCreateInfo::layout(layout)
+                },
+            )?
+        };
+
         Ok(Self {
             queue,
             memory_allocator,
             command_allocator,
+            graphics_pipeline,
+            vertex_buffer,
         })
     }
 
@@ -89,5 +215,9 @@ impl VulkanDevice {
 
     pub fn command_allocator(&self) -> &Arc<StandardCommandBufferAllocator> {
         &self.command_allocator
+    }
+
+    pub fn graphics_pipeline(&self) -> &Arc<GraphicsPipeline> {
+        &self.graphics_pipeline
     }
 }
