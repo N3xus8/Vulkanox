@@ -79,4 +79,4 @@ pub const VERTICES: [Vertex; 3] = [
     },
 ];
 
-pub const INDICES: [u32;3] = [0, 1, 1];
+pub const INDICES: [u32; 3] = [0, 1, 1];

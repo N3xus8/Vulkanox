@@ -4,10 +4,16 @@ use std::sync::Arc;
 
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
-    command_buffer::allocator::StandardCommandBufferAllocator,
+    command_buffer::{
+        self, allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder,
+        CommandBufferUsage, CopyBufferInfo,
+    },
     device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo},
     format::Format,
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
+    memory::{
+        allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
+        MemoryPropertyFlags,
+    },
     pipeline::{
         graphics::{
             color_blend::{ColorBlendAttachmentState, ColorBlendState},
@@ -20,9 +26,10 @@ use vulkano::{
             GraphicsPipelineCreateInfo,
         },
         layout::PipelineDescriptorSetLayoutCreateInfo,
-        DynamicState, GraphicsPipeline, PipelineLayout,
-        PipelineShaderStageCreateInfo,
+        DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
     },
+    sync::{self, GpuFuture},
+    DeviceSize,
 };
 
 use crate::{
@@ -36,7 +43,7 @@ pub struct VulkanDevice {
     command_allocator: Arc<StandardCommandBufferAllocator>,
     graphics_pipeline: Arc<GraphicsPipeline>,
     pub vertex_buffer: Subbuffer<[shader::Vertex]>,
-    pub index_buffer: Subbuffer<[u32]>
+    pub index_buffer: Subbuffer<[u32]>,
 }
 
 impl VulkanDevice {
@@ -96,38 +103,102 @@ impl VulkanDevice {
             Default::default(),
         ));
 
-        // Create a Vertex buffer  : subbuffer<[Vertex]>
+        // Create a Staging Vertex buffer  : subbuffer<[Vertex]>
 
-        let vertex_buffer = Buffer::from_iter(
+        let vertex_staging_buffer = Buffer::from_iter(
             memory_allocator.clone(),
             BufferCreateInfo {
-                usage: BufferUsage::VERTEX_BUFFER,
+                usage: BufferUsage::TRANSFER_SRC,
                 ..Default::default()
             },
             AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST,
                 ..Default::default()
             },
             shader::VERTICES,
         )?;
 
-        // Create an index buffer : subbuffer<[u32]>
+        // Create an Staging index buffer : subbuffer<[u32]>
 
-        let index_buffer = Buffer::from_iter(
+        let index_staging_buffer = Buffer::from_iter(
             memory_allocator.clone(),
             BufferCreateInfo {
-                usage: BufferUsage::INDEX_BUFFER,
+                usage: BufferUsage::TRANSFER_SRC,
                 ..Default::default()
             },
             AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST,
                 ..Default::default()
             },
             INDICES,
         )?;
 
+        // Create a Vertex buffer  : subbuffer<[Vertex]>
+
+        let vertex_buffer = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DST,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter {
+                    required_flags: MemoryPropertyFlags::DEVICE_LOCAL, // Make sure this buffer is on the Device=GPU
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            shader::VERTICES.len() as DeviceSize,
+        )?;
+
+        // Create an index buffer : subbuffer<[u32]>
+
+        let index_buffer = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::INDEX_BUFFER | BufferUsage::TRANSFER_DST,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter {
+                    required_flags: MemoryPropertyFlags::DEVICE_LOCAL, // Make sure this buffer is on the Device=GPU
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            INDICES.len() as DeviceSize,
+        )?;
+
+        // ---->
+        // Staging buffer to Device buffer
+        // <-----
+
+        // command to copy buffer on host to  buffer on device
+        let mut command_builder = AutoCommandBufferBuilder::primary(
+            &command_allocator,
+            queue_family_index,
+            CommandBufferUsage::OneTimeSubmit,
+        )?;
+
+        // build command
+        command_builder.copy_buffer(CopyBufferInfo::buffers(
+            vertex_staging_buffer,
+            vertex_buffer.clone(),
+        ))?;
+        command_builder.copy_buffer(CopyBufferInfo::buffers(
+            index_staging_buffer,
+            index_buffer.clone(),
+        ))?;
+
+        let command_buffer = command_builder.build()?;
+
+        // submit command
+        let buffers_upload_future = sync::now(Arc::clone(&device))
+            .then_execute(Arc::clone(&queue), command_buffer)?
+            .then_signal_fence_and_flush()?;
+
+
+        //
 
         // ---->
         // Graphics Pipeline - Shader
@@ -213,6 +284,8 @@ impl VulkanDevice {
                 },
             )?
         };
+
+        buffers_upload_future.wait(None)?; // Not sure this works? Is this needed
 
         Ok(Self {
             queue,

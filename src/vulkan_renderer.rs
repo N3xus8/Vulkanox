@@ -9,7 +9,7 @@ use vulkano::{
         RenderingAttachmentInfo, RenderingInfo,
     },
     device::DeviceOwned,
-    format::{Format, ClearValue},
+    format::{ClearValue, Format},
     image::{view::ImageView, Image, ImageUsage},
     pipeline::graphics::viewport::Viewport,
     render_pass::{AttachmentLoadOp, AttachmentStoreOp},
@@ -56,11 +56,11 @@ impl VulkanRenderer {
             physical_device.surface_capabilities(&surface, Default::default())?;
 
         // Choosing the internal format that the images will have.
-       /*  let image_format = device
-            .physical_device()
-            .surface_formats(&surface, Default::default())
-            .unwrap()[0]
-            .0; */
+        /*  let image_format = device
+        .physical_device()
+        .surface_formats(&surface, Default::default())
+        .unwrap()[0]
+        .0; */
 
         // create the swapchain
 
