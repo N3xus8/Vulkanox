@@ -18,26 +18,22 @@ pub mod vs {
     vulkano_shaders::shader! {
         ty: "vertex",
         src: r"
-                #version 450
+                #version 460
+
+                layout(location = 0) in vec3 position;
+
+                layout(location = 1) in vec3 color;
 
                 layout(location = 0) out vec3 fragColor;
 
-                vec2 positions[3] = vec2[](
-                    vec2(0.0, -0.5),
-                    vec2(0.5, 0.5),
-                    vec2(-0.5, 0.5)
-                );
-
-                vec3 colors[3] = vec3[](
-                    vec3(1.0, 0.0, 0.0),
-                    vec3(0.0, 1.0, 0.0),
-                    vec3(0.0, 0.0, 1.0)
-                );
+                layout(push_constant) uniform PushConstantData {
+                    float time;
+                } pc;
 
 
                 void main() {
-                    gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);
-                    fragColor = colors[gl_VertexIndex];
+                    gl_Position = vec4(position*sin(pc.time), 1.0);
+                    fragColor = color ;
                 }
             ",
     }
@@ -47,7 +43,7 @@ pub mod fs {
     vulkano_shaders::shader! {
         ty: "fragment",
         src: r"
-                #version 450
+                #version 460
 
                 layout(location = 0) in vec3 fragColor;
 
@@ -63,19 +59,24 @@ pub mod fs {
 #[derive(BufferContents, VertexInput)]
 #[repr(C)]
 pub struct Vertex {
-    #[format(R32G32_SFLOAT)]
-    pub position: [f32; 2],
+    #[format(R32G32B32_SFLOAT)]
+    pub position: [f32; 3],
+    #[format(R32G32B32_SFLOAT)]
+    pub color: [f32; 3],
 }
 
 pub const VERTICES: [Vertex; 3] = [
     Vertex {
-        position: [-0.5, -0.25],
+        position: [0.0, -0.25, 0.0],
+        color: [1.0, 0.0, 0.0],
     },
     Vertex {
-        position: [0.0, 0.5],
+        position: [-0.5, 0.25, 0.0],
+        color: [0.0, 1.0, 0.0],
     },
     Vertex {
-        position: [0.25, -0.1],
+        position: [0.5, 0.25, 0.0],
+        color: [0.0, 0.0, 1.0],
     },
 ];
 

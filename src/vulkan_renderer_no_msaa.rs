@@ -5,13 +5,11 @@ use std::{sync::Arc, time::Instant, u32};
 use palette::Srgba;
 use vulkano::{
     command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, RenderingAttachmentInfo,
-        RenderingAttachmentResolveInfo, RenderingInfo,
+        AutoCommandBufferBuilder, CommandBufferUsage, RenderingAttachmentInfo, RenderingInfo,
     },
     device::DeviceOwned,
     format::{ClearValue, Format},
-    image::{view::ImageView, Image, ImageCreateInfo, ImageType, ImageUsage, SampleCount},
-    memory::allocator::AllocationCreateInfo,
+    image::{view::ImageView, Image, ImageUsage},
     pipeline::{graphics::viewport::Viewport, Pipeline},
     render_pass::{AttachmentLoadOp, AttachmentStoreOp},
     swapchain::{
@@ -30,8 +28,7 @@ pub struct VulkanRenderer {
     pub swapchain: Arc<Swapchain>,
     pub swapchain_images: Vec<Arc<Image>>,
     pub swapchain_image_views: Vec<Arc<ImageView>>,
-    pub intermediary_image: Arc<ImageView>, // for msaa (multi-sample anti-aliasing)
-    pub previous_frame_end: Option<Box<dyn GpuFuture>>, // synchro
+    pub previous_frame_end: Option<Box<dyn GpuFuture>>,
     pub start_time: Instant,
 }
 
@@ -90,24 +87,6 @@ impl VulkanRenderer {
         // each image.
         let swapchain_image_views = window_size_dependent_setup(&swapchain_images);
 
-        // Creating our intermediate multisampled image.
-        //
-        // MSAA  We pass the same extent and format as for the final
-        // image. But we also pass the number of samples-per-pixel, which is 4 here.
-
-        let intermediary_image = ImageView::new_default(Image::new(
-            vulkan_device.memory_allocator.clone(),
-            ImageCreateInfo {
-                image_type: ImageType::Dim2d,
-                format: swapchain.image_format(),
-                extent: [swapchain.image_extent()[0], swapchain.image_extent()[1], 1],
-                usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT, // transient image
-                samples: SampleCount::Sample4,
-                ..Default::default()
-            },
-            AllocationCreateInfo::default(),
-        )?)?;
-
         // In the event loop  we are going to submit commands to the GPU. Submitting a command produces
         // an object that implements the `GpuFuture` trait, which holds the resources for as long as
         // they are in use by the GPU.
@@ -122,7 +101,6 @@ impl VulkanRenderer {
             swapchain,
             swapchain_images,
             swapchain_image_views,
-            intermediary_image,
             previous_frame_end,
             start_time: std::time::Instant::now(),
         })
@@ -137,7 +115,6 @@ impl VulkanRenderer {
 
         self.swapchain_images.clear();
         self.swapchain_image_views.clear();
-        
 
         let (new_swapchain, new_swapchain_images) =
             self.swapchain.recreate(SwapchainCreateInfo {
@@ -152,22 +129,6 @@ impl VulkanRenderer {
         self.swapchain = new_swapchain;
         self.swapchain_images = new_swapchain_images;
         self.swapchain_image_views = new_swapchain_image_views;
-        self.intermediary_image = ImageView::new_default(Image::new(
-            self.vulkan_device.memory_allocator.clone(),
-            ImageCreateInfo {
-                image_type: ImageType::Dim2d,
-                format: self.swapchain.image_format(),
-                extent: [
-                    self.swapchain.image_extent()[0],
-                    self.swapchain.image_extent()[1],
-                    1,
-                ],
-                usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT, // transient image
-                samples: SampleCount::Sample4,
-                ..Default::default()
-            },
-            AllocationCreateInfo::default(),
-        )?)?;
 
         Ok(())
     }
@@ -277,19 +238,10 @@ impl VulkanRenderer {
                     // Only attachments that have `AttachmentLoadOp::Clear` are provided
                     // with clear values, any others should use `None` as the clear value.
                     clear_value: Some(ClearValue::Float(clear_color_srgba.into_linear().into())),
-
-                    // MSAA Resolve
-                    resolve_info: Some(RenderingAttachmentResolveInfo::image_view(Arc::clone(
-                        &self.swapchain_image_views[image_index as usize],
-                    ))),
-                    // Instead of rendering directly to the swapchain image rendering to the intermediary image with multi-sample: 4
-                    // And then resolving into the swapchain image which only have 1 sample (see above)
-
-                    // intermediary image for MSAA
                     ..RenderingAttachmentInfo::image_view(
-                        Arc::clone(&self.intermediary_image), // We specify image view corresponding to the currently acquired
-                                                              // swapchain image, to use for this attachment.
-                                                              // Original without MSAA 👉  Arc::clone(&self.swapchain_image_views[image_index as usize]),
+                        // We specify image view corresponding to the currently acquired
+                        // swapchain image, to use for this attachment.
+                        Arc::clone(&self.swapchain_image_views[image_index as usize]),
                     )
                 })],
                 ..Default::default()

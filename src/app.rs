@@ -8,7 +8,9 @@ use winit::{
 };
 
 use crate::{
-    error::Result, vulkan_device::VulkanDevice, vulkan_instance::VulkanInstance,
+    error::{self, Result},
+    vulkan_device::VulkanDevice,
+    vulkan_instance::VulkanInstance,
     vulkan_renderer::VulkanRenderer,
 };
 
@@ -31,16 +33,22 @@ impl VisualSystem {
         );
         let primary_window_id = primary_window.id();
 
-        let vulkan_instance = Arc::new(VulkanInstance::new(Arc::clone(&primary_window))?);
+        let vulkan_instance = Arc::new(
+            VulkanInstance::new(Arc::clone(&primary_window))
+                .map_err(|_| error::VisualSystemError::ErrorCreatingVulkanInstance)?,
+        );
 
-        let vulkan_device = Arc::new(VulkanDevice::new(Arc::clone(&vulkan_instance))?);
+        let vulkan_device = Arc::new(
+            VulkanDevice::new(Arc::clone(&vulkan_instance))
+                .map_err(|_| error::VisualSystemError::ErrorCreatingVulkanDevice)?,
+        );
 
         // Store the windows in a BTreeMap
         let mut windows = BTreeMap::from([(primary_window_id, Arc::clone(&primary_window))]);
 
         let symbol_list = "♔♕♖♗♘♙☚★";
 
-        for idx in 0..3 {
+        for idx in 0..0 {
             let char_at_index = symbol_list
                 .chars()
                 .nth(idx % (symbol_list.chars().count()))
@@ -60,11 +68,14 @@ impl VisualSystem {
         for (window_id, window) in &windows {
             vulkan_renderers.insert(
                 *window_id,
-                Arc::new(RefCell::new(VulkanRenderer::new(
-                    Arc::clone(&vulkan_device),
-                    Arc::clone(&window),
-                    ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSFER_DST,
-                )?)),
+                Arc::new(RefCell::new(
+                    VulkanRenderer::new(
+                        Arc::clone(&vulkan_device),
+                        Arc::clone(&window),
+                        ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSFER_DST,
+                    )
+                    .map_err(|_| error::VisualSystemError::ErrorCreatingVulkanRenderer)?,
+                )),
             );
         }
 
@@ -86,12 +97,15 @@ impl VisualSystem {
         for (window_id, window) in &self.windows {
             self.vulkan_renderers.insert(
                 *window_id,
-                Arc::new(RefCell::new(VulkanRenderer::new(
-                    // Use RefCell fo interior mutability
-                    Arc::clone(&self.vulkan_device),
-                    Arc::clone(&window),
-                    ImageUsage::COLOR_ATTACHMENT,
-                )?)),
+                Arc::new(RefCell::new(
+                    VulkanRenderer::new(
+                        // Use RefCell fo interior mutability
+                        Arc::clone(&self.vulkan_device),
+                        Arc::clone(&window),
+                        ImageUsage::COLOR_ATTACHMENT,
+                    )
+                    .map_err(|_| error::VisualSystemError::ErrorCreatingVulkanRenderer)?,
+                )),
             );
         }
         Ok(())
@@ -131,7 +145,10 @@ impl App {
     }
 
     pub fn start<T>(&mut self, window_target: &EventLoopWindowTarget<T>) -> Result<()> {
-        self.visual_system = Some(VisualSystem::new(window_target)?);
+        self.visual_system = Some(
+            VisualSystem::new(window_target)
+                .map_err(|_| error::VisualSystemError::ErrorCreatingVisualSystem)?,
+        );
 
         Ok(())
     }
@@ -140,7 +157,8 @@ impl App {
         self.visual_system
             .as_mut()
             .expect("no visual system")
-            .resume(window_target)?;
+            .resume(window_target)
+            .map_err(|_| error::VisualSystemError::ErrorResumingVisualSystem)?;
 
         Ok(())
     }
@@ -165,12 +183,19 @@ impl App {
                     }
                 }
                 WindowEvent::Resized(_) => {
-                    self.visual_system.as_mut().unwrap().resize(window_id)?
+                    self.visual_system
+                        .as_mut()
+                        .unwrap()
+                        .resize(window_id)
+                        .map_err(|_| error::VisualSystemError::ErrorResizingVisualSystem)?
                 }
 
-                WindowEvent::RedrawRequested => {
-                    self.visual_system.as_mut().unwrap().draw(window_id)?
-                }
+                WindowEvent::RedrawRequested => self
+                    .visual_system
+                    .as_mut()
+                    .unwrap()
+                    .draw(window_id)
+                    .map_err(|_| error::VisualSystemError::ErrorDrawingVisualSystem)?,
 
                 _ => {}
             },
@@ -189,7 +214,12 @@ impl App {
                 self.suspend();
             }
 
-            Event::AboutToWait => self.visual_system.as_mut().unwrap().request_redraw()?,
+            Event::AboutToWait => self
+                .visual_system
+                .as_mut()
+                .unwrap()
+                .request_redraw()
+                .map_err(|_| error::VisualSystemError::ErrorRequestReDrawVisualSystem)?,
             _ => {}
         }
 

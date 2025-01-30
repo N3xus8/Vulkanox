@@ -1,5 +1,6 @@
 // Note: Logical Device
-
+// O R I G I N A L
+// NO MSAA
 use std::sync::Arc;
 
 use vulkano::{
@@ -10,7 +11,6 @@ use vulkano::{
     },
     device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo},
     format::Format,
-    image::SampleCount,
     memory::{
         allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
         MemoryPropertyFlags,
@@ -40,7 +40,7 @@ use crate::{
 };
 pub struct VulkanDevice {
     pub queue: Arc<Queue>,
-    pub memory_allocator: Arc<StandardMemoryAllocator>,
+    memory_allocator: Arc<StandardMemoryAllocator>,
     command_allocator: Arc<StandardCommandBufferAllocator>,
     graphics_pipeline: Arc<GraphicsPipeline>,
     pub vertex_buffer: Subbuffer<[shader::Vertex]>,
@@ -136,6 +136,8 @@ impl VulkanDevice {
         )?;
         // --->
 
+
+
         // Create a Vertex buffer  : subbuffer<[Vertex]>
 
         let vertex_buffer = Buffer::new_slice(
@@ -177,7 +179,7 @@ impl VulkanDevice {
         // <-----
 
         // command to copy buffer on host to  buffer on device
-        // command builder:
+        // command builder: 
         let mut command_builder = AutoCommandBufferBuilder::primary(
             &command_allocator,
             queue_family_index,
@@ -207,8 +209,7 @@ impl VulkanDevice {
         // Graphics Pipeline - Shader
         // ---->
 
-        let graphics_pipeline = {
-            // 👈 scope to make sure shaders are dropped once pipelines are created.
+        let graphics_pipeline = {  // 👈 scope to make sure shaders are dropped once pipelines are created.
 
             let vertex_shader = vs::load(Arc::clone(&device))?.entry_point("main").unwrap();
             let fragment_shader = fs::load(Arc::clone(&device))?.entry_point("main").unwrap();
@@ -274,12 +275,7 @@ impl VulkanDevice {
                     }),
                     // How multiple fragment shader samples are converted to a single pixel value.
                     // The default value does not perform any multisampling.
-                    //Original without MSAA 👉 multisample_state: Some(MultisampleState::default()),
-                    multisample_state: Some(MultisampleState {
-                        // MSAA
-                        rasterization_samples: SampleCount::Sample4,
-                        ..Default::default()
-                    }),
+                    multisample_state: Some(MultisampleState::default()),
                     // How pixel values are combined with the values already present in the framebuffer.
                     // The default value overwrites the old value with the new one, without any blending.
                     color_blend_state: Some(ColorBlendState::with_attachment_states(
