@@ -31,6 +31,7 @@ pub struct VulkanRenderer {
     pub swapchain_images: Vec<Arc<Image>>,
     pub swapchain_image_views: Vec<Arc<ImageView>>,
     pub intermediary_image: Arc<ImageView>, // for msaa (multi-sample anti-aliasing)
+    pub depth_view: Arc<ImageView>,         // Depth
     pub previous_frame_end: Option<Box<dyn GpuFuture>>, // synchro
     pub start_time: Instant,
 }
@@ -108,6 +109,22 @@ impl VulkanRenderer {
             AllocationCreateInfo::default(),
         )?)?;
 
+        // Depth buffer
+
+        // Depth image view
+        let depth_view: Arc<ImageView> = ImageView::new_default(Image::new(
+            vulkan_device.memory_allocator.clone(),
+            ImageCreateInfo {
+                image_type: ImageType::Dim2d,
+                format: Format::D16_UNORM,
+                extent: [swapchain.image_extent()[0], swapchain.image_extent()[1], 1],
+                usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
+                samples: SampleCount::Sample4, // Match intermediary
+                ..Default::default()
+            },
+            AllocationCreateInfo::default(),
+        )?)?;
+
         // In the event loop  we are going to submit commands to the GPU. Submitting a command produces
         // an object that implements the `GpuFuture` trait, which holds the resources for as long as
         // they are in use by the GPU.
@@ -125,6 +142,7 @@ impl VulkanRenderer {
             intermediary_image,
             previous_frame_end,
             start_time: std::time::Instant::now(),
+            depth_view,
         })
     }
 
@@ -163,6 +181,23 @@ impl VulkanRenderer {
                 ],
                 usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT, // transient image
                 samples: SampleCount::Sample4,
+                ..Default::default()
+            },
+            AllocationCreateInfo::default(),
+        )?)?;
+
+        self.depth_view = ImageView::new_default(Image::new(
+            self.vulkan_device.memory_allocator.clone(),
+            ImageCreateInfo {
+                image_type: ImageType::Dim2d,
+                format: Format::D16_UNORM,
+                extent: [
+                    self.swapchain.image_extent()[0],
+                    self.swapchain.image_extent()[1],
+                    1,
+                ],
+                usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
+                samples: SampleCount::Sample4, // Match intermediary
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -292,6 +327,13 @@ impl VulkanRenderer {
                                                               // Original without MSAA 👉  Arc::clone(&self.swapchain_image_views[image_index as usize]),
                     )
                 })],
+                // {---- Depth attachment
+                depth_attachment: Some(RenderingAttachmentInfo {
+                    load_op: AttachmentLoadOp::Clear,
+                    clear_value: Some(1.0f32.into()),
+                    ..RenderingAttachmentInfo::image_view(Arc::clone(&self.depth_view))
+                }),
+                // -----}
                 ..Default::default()
             })?
             // We are now inside the first subpass of the render pass.
@@ -313,7 +355,7 @@ impl VulkanRenderer {
                 push_constants,
             )?
             // We add a draw command.
-//            .draw(self.vulkan_device.vertex_buffer.len() as u32, 1, 0, 0)?
+            //            .draw(self.vulkan_device.vertex_buffer.len() as u32, 1, 0, 0)?
             .draw_indexed(self.vulkan_device.index_buffer.len() as u32, 1, 0, 0, 0)?
             // We leave the render pass.
             .end_rendering()?;

@@ -1,6 +1,9 @@
 // Note: Logical Device
 
-use std::{f32::consts::{FRAC_PI_2, FRAC_PI_4}, sync::Arc};
+use std::{
+    f32::consts::{FRAC_PI_2, FRAC_PI_4, PI},
+    sync::Arc,
+};
 
 use vulkano::{
     buffer::{
@@ -8,14 +11,13 @@ use vulkano::{
         Buffer, BufferCreateInfo, BufferUsage, Subbuffer,
     },
     command_buffer::{
-        self, allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder,
-        CommandBufferUsage, CopyBufferInfo,
+        allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
+        CopyBufferInfo,
     },
     descriptor_set::{
-        self,
         allocator::{StandardDescriptorSetAllocator, StandardDescriptorSetAllocatorCreateInfo},
         layout::DescriptorSetLayout,
-        DescriptorSet, PersistentDescriptorSet, WriteDescriptorSet,
+        PersistentDescriptorSet, WriteDescriptorSet,
     },
     device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo},
     format::Format,
@@ -27,6 +29,7 @@ use vulkano::{
     pipeline::{
         graphics::{
             color_blend::{ColorBlendAttachmentState, ColorBlendState},
+            depth_stencil::{DepthState, DepthStencilState},
             input_assembly::InputAssemblyState,
             multisample::MultisampleState,
             rasterization::{CullMode, RasterizationState},
@@ -34,7 +37,9 @@ use vulkano::{
             vertex_input::{Vertex as VertexInput, VertexDefinition},
             viewport::ViewportState,
             GraphicsPipelineCreateInfo,
-        }, layout::PipelineDescriptorSetLayoutCreateInfo, DynamicState, GraphicsPipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo
+        },
+        layout::PipelineDescriptorSetLayoutCreateInfo,
+        DynamicState, GraphicsPipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
     },
     sync::{self, GpuFuture},
     DeviceSize,
@@ -130,7 +135,7 @@ impl VulkanDevice {
         let vertices_length = vertices.len();
         let indices_length = indices.len();
 
-        let indices: Vec<u32> = indices.iter().map(|id| { *id as u32}).collect();
+        let indices: Vec<u32> = indices.iter().map(|id| *id as u32).collect();
 
         // <---  -S T A G I N G  B U F F E R S-
         // Create a Staging Vertex buffer  : subbuffer<[Vertex]>
@@ -203,16 +208,18 @@ impl VulkanDevice {
         // <----
         // Camera
         // ----->
+
+        // Camera setup
         let camera = Camera {
             // position the camera 1 unit up and 2 units back
             // +z is out of the screen
-            eye: nalgebra::Point3::new(0.77, -0.67, 0.9),
+            eye: nalgebra::Point3::new(0.97, 0.97, 1.97),
             // have it look at the origin
             target: nalgebra::Point3::new(0.0, 0.0, 0.0),
             // which way is "up"
             up: nalgebra::Vector3::y(),
             aspect: 800 as f32 / 600 as f32, // ⚠ Caution! Hard Coded , Bad ! Bad !
-            fovy: FRAC_PI_2,
+            fovy: FRAC_PI_4,
             znear: 0.1,
             zfar: 100.0,
         };
@@ -243,7 +250,8 @@ impl VulkanDevice {
             uniform_staging_buffer_allocator.allocate_sized()?;
         *uniform_staging_buffer.write()? = camera_uniform;
 
-        let uniform_buffer: Subbuffer<CameraUniform> = uniform_buffer_allocator.allocate_sized().unwrap();
+        let uniform_buffer: Subbuffer<CameraUniform> =
+            uniform_buffer_allocator.allocate_sized().unwrap();
 
         // ---->
         // Staging buffers to Device buffers
@@ -328,6 +336,7 @@ impl VulkanDevice {
                 // rendering, we will specify a swapchain image to be used as this attachment, so here
                 // we set its format to be the same format as the swapchain.
                 color_attachment_formats: vec![Some(Format::B8G8R8A8_SRGB)], // ⚠ Caution! Hard coded
+                depth_attachment_format: Some(Format::D16_UNORM),
                 ..Default::default()
             };
 
@@ -348,6 +357,12 @@ impl VulkanDevice {
                     // The default value does not perform any culling.
                     rasterization_state: Some(RasterizationState {
                         cull_mode: CullMode::Back,
+                        ..Default::default()
+                    }),
+                    // Depth
+                    depth_stencil_state: Some(DepthStencilState {
+                        // Simple = CompareOp::Less,
+                        depth: Some(DepthState::simple()),
                         ..Default::default()
                     }),
                     // How multiple fragment shader samples are converted to a single pixel value.
@@ -377,7 +392,8 @@ impl VulkanDevice {
         let descriptor_set = PersistentDescriptorSet::new(
             &descriptor_set_allocator,
             Arc::clone(
-                graphics_pipeline.layout()
+                graphics_pipeline
+                    .layout()
                     .set_layouts()
                     .get(0)
                     .expect("error getting the layout"),
