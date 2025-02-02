@@ -22,14 +22,9 @@ pub mod vs {
 
                 layout(location = 0) in vec3 position;
 
+                layout(location = 1) in vec3 color;
+
                 layout(location = 0) out vec3 fragColor;
-
-               // layout(location = 1) in vec3 color;
-
-               layout(set = 0, binding = 0) uniform data {
-                    mat4 view_projection;
-               } uniforms;
-
 
                 layout(push_constant) uniform PushConstantData {
                     float time;
@@ -37,10 +32,8 @@ pub mod vs {
 
 
                 void main() {
-                   // Original gl_Position = vec4(position*sin(pc.time), 1.0);
-                    gl_Position = uniforms.view_projection * vec4(position, 1.0);
-                    //gl_Position =  vec4(position, 1.0);
-                    fragColor = position ;
+                    gl_Position = vec4(position*sin(pc.time), 1.0);
+                    fragColor = color ;
                 }
             ",
     }
@@ -63,22 +56,27 @@ pub mod fs {
     }
 }
 
-#[derive(Debug, BufferContents, VertexInput)]
+#[derive(BufferContents, VertexInput)]
 #[repr(C)]
 pub struct Vertex {
     #[format(R32G32B32_SFLOAT)]
     pub position: [f32; 3],
+    #[format(R32G32B32_SFLOAT)]
+    pub color: [f32; 3],
 }
 
 pub const VERTICES: [Vertex; 3] = [
     Vertex {
         position: [0.0, -0.25, 0.0],
+        color: [1.0, 0.0, 0.0],
     },
     Vertex {
         position: [-0.5, 0.25, 0.0],
+        color: [0.0, 1.0, 0.0],
     },
     Vertex {
         position: [0.5, 0.25, 0.0],
+        color: [0.0, 0.0, 1.0],
     },
 ];
 

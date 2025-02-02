@@ -5,6 +5,8 @@ use error::Result;
 use winit::event_loop::EventLoopBuilder;
 
 mod app;
+mod camera;
+mod mesh;
 mod shader;
 mod vulkan_device;
 mod vulkan_instance;

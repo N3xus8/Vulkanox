@@ -12,7 +12,7 @@ use vulkano::{
     format::{ClearValue, Format},
     image::{view::ImageView, Image, ImageCreateInfo, ImageType, ImageUsage, SampleCount},
     memory::allocator::AllocationCreateInfo,
-    pipeline::{graphics::viewport::Viewport, Pipeline},
+    pipeline::{graphics::viewport::Viewport, Pipeline, PipelineBindPoint},
     render_pass::{AttachmentLoadOp, AttachmentStoreOp},
     swapchain::{
         acquire_next_image, Surface, Swapchain, SwapchainCreateInfo, SwapchainPresentInfo,
@@ -137,7 +137,6 @@ impl VulkanRenderer {
 
         self.swapchain_images.clear();
         self.swapchain_image_views.clear();
-        
 
         let (new_swapchain, new_swapchain_images) =
             self.swapchain.recreate(SwapchainCreateInfo {
@@ -256,6 +255,7 @@ impl VulkanRenderer {
         // ----->
         // Command buffer builder
         // <-----
+        //println!("DEBUG INDEX BUFFER: {:} ", self.vulkan_device.index_buffer().len());
 
         // Before we can draw, we have to *enter a render pass*. We specify which
         // attachments we are going to use for rendering here, which needs to match
@@ -301,13 +301,20 @@ impl VulkanRenderer {
             .bind_pipeline_graphics(Arc::clone(&self.vulkan_device.graphics_pipeline()))?
             .bind_vertex_buffers(0, self.vulkan_device.vertex_buffer.clone())?
             .bind_index_buffer(self.vulkan_device.index_buffer().clone())?
+            .bind_descriptor_sets(
+                PipelineBindPoint::Graphics,
+                Arc::clone(self.vulkan_device.graphics_pipeline().layout()),
+                0,
+                Arc::clone(&self.vulkan_device.descriptor_set()),
+            )?
             .push_constants(
                 Arc::clone(&self.vulkan_device.graphics_pipeline().layout()),
                 0,
                 push_constants,
             )?
             // We add a draw command.
-            .draw(self.vulkan_device.vertex_buffer.len() as u32, 1, 0, 0)?
+//            .draw(self.vulkan_device.vertex_buffer.len() as u32, 1, 0, 0)?
+            .draw_indexed(self.vulkan_device.index_buffer.len() as u32, 1, 0, 0, 0)?
             // We leave the render pass.
             .end_rendering()?;
 

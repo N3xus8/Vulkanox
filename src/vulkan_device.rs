@@ -1,12 +1,21 @@
 // Note: Logical Device
 
-use std::sync::Arc;
+use std::{f32::consts::{FRAC_PI_2, FRAC_PI_4}, sync::Arc};
 
 use vulkano::{
-    buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
+    buffer::{
+        allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
+        Buffer, BufferCreateInfo, BufferUsage, Subbuffer,
+    },
     command_buffer::{
         self, allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder,
         CommandBufferUsage, CopyBufferInfo,
+    },
+    descriptor_set::{
+        self,
+        allocator::{StandardDescriptorSetAllocator, StandardDescriptorSetAllocatorCreateInfo},
+        layout::DescriptorSetLayout,
+        DescriptorSet, PersistentDescriptorSet, WriteDescriptorSet,
     },
     device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo},
     format::Format,
@@ -25,17 +34,17 @@ use vulkano::{
             vertex_input::{Vertex as VertexInput, VertexDefinition},
             viewport::ViewportState,
             GraphicsPipelineCreateInfo,
-        },
-        layout::PipelineDescriptorSetLayoutCreateInfo,
-        DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
+        }, layout::PipelineDescriptorSetLayoutCreateInfo, DynamicState, GraphicsPipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo
     },
     sync::{self, GpuFuture},
     DeviceSize,
 };
 
 use crate::{
+    camera::{Camera, CameraUniform},
     error::Result,
-    shader::{self, fs, vs, INDICES},
+    mesh::MeshBuilder,
+    shader::{self, fs, vs},
     vulkan_instance::VulkanInstance,
 };
 pub struct VulkanDevice {
@@ -45,6 +54,7 @@ pub struct VulkanDevice {
     graphics_pipeline: Arc<GraphicsPipeline>,
     pub vertex_buffer: Subbuffer<[shader::Vertex]>,
     pub index_buffer: Subbuffer<[u32]>,
+    pub descriptor_set: Arc<PersistentDescriptorSet>,
 }
 
 impl VulkanDevice {
@@ -104,6 +114,24 @@ impl VulkanDevice {
             Default::default(),
         ));
 
+        //<----
+        // Decriptor set Allocator
+        //---->
+        let descriptor_set_allocator = Arc::new(StandardDescriptorSetAllocator::new(
+            Arc::clone(&device),
+            StandardDescriptorSetAllocatorCreateInfo::default(),
+        ));
+
+        // ---->
+        //
+        let gltf_mesh = MeshBuilder::read_gltf("assets/Box.gltf")?;
+        let vertices = gltf_mesh.vertices()?;
+        let indices = gltf_mesh.indices();
+        let vertices_length = vertices.len();
+        let indices_length = indices.len();
+
+        let indices: Vec<u32> = indices.iter().map(|id| { *id as u32}).collect();
+
         // <---  -S T A G I N G  B U F F E R S-
         // Create a Staging Vertex buffer  : subbuffer<[Vertex]>
 
@@ -117,7 +145,7 @@ impl VulkanDevice {
                 memory_type_filter: MemoryTypeFilter::PREFER_HOST,
                 ..Default::default()
             },
-            shader::VERTICES,
+            vertices,
         )?;
 
         // Create an Staging index buffer : subbuffer<[u32]>
@@ -132,7 +160,7 @@ impl VulkanDevice {
                 memory_type_filter: MemoryTypeFilter::PREFER_HOST,
                 ..Default::default()
             },
-            INDICES,
+            indices,
         )?;
         // --->
 
@@ -151,7 +179,7 @@ impl VulkanDevice {
                 },
                 ..Default::default()
             },
-            shader::VERTICES.len() as DeviceSize,
+            vertices_length as DeviceSize,
         )?;
 
         // Create an index buffer : subbuffer<[u32]>
@@ -169,11 +197,56 @@ impl VulkanDevice {
                 },
                 ..Default::default()
             },
-            INDICES.len() as DeviceSize,
+            indices_length as DeviceSize,
         )?;
 
+        // <----
+        // Camera
+        // ----->
+        let camera = Camera {
+            // position the camera 1 unit up and 2 units back
+            // +z is out of the screen
+            eye: nalgebra::Point3::new(0.77, -0.67, 0.9),
+            // have it look at the origin
+            target: nalgebra::Point3::new(0.0, 0.0, 0.0),
+            // which way is "up"
+            up: nalgebra::Vector3::y(),
+            aspect: 800 as f32 / 600 as f32, // ⚠ Caution! Hard Coded , Bad ! Bad !
+            fovy: FRAC_PI_2,
+            znear: 0.1,
+            zfar: 100.0,
+        };
+
+        let mut camera_uniform = CameraUniform::new();
+        camera_uniform.update_view_proj(&camera);
+
+        let uniform_staging_buffer_allocator = SubbufferAllocator::new(
+            memory_allocator.clone(),
+            SubbufferAllocatorCreateInfo {
+                buffer_usage: BufferUsage::TRANSFER_SRC,
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST,
+                ..Default::default()
+            },
+        );
+
+        let uniform_buffer_allocator = SubbufferAllocator::new(
+            memory_allocator.clone(),
+            SubbufferAllocatorCreateInfo {
+                buffer_usage: BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+        );
+
+        let uniform_staging_buffer: Subbuffer<CameraUniform> =
+            uniform_staging_buffer_allocator.allocate_sized()?;
+        *uniform_staging_buffer.write()? = camera_uniform;
+
+        let uniform_buffer: Subbuffer<CameraUniform> = uniform_buffer_allocator.allocate_sized().unwrap();
+
         // ---->
-        // Staging buffer to Device buffer
+        // Staging buffers to Device buffers
         // <-----
 
         // command to copy buffer on host to  buffer on device
@@ -192,6 +265,11 @@ impl VulkanDevice {
         command_builder.copy_buffer(CopyBufferInfo::buffers(
             index_staging_buffer,
             index_buffer.clone(),
+        ))?;
+
+        command_builder.copy_buffer(CopyBufferInfo::buffers(
+            uniform_staging_buffer,
+            uniform_buffer.clone(),
         ))?;
 
         let command_buffer = command_builder.build()?;
@@ -296,6 +374,18 @@ impl VulkanDevice {
             )?
         };
 
+        let descriptor_set = PersistentDescriptorSet::new(
+            &descriptor_set_allocator,
+            Arc::clone(
+                graphics_pipeline.layout()
+                    .set_layouts()
+                    .get(0)
+                    .expect("error getting the layout"),
+            ),
+            [WriteDescriptorSet::buffer(0, uniform_buffer)],
+            [],
+        )?;
+
         buffers_upload_future.wait(None)?; // Not sure this works? Is this needed
 
         Ok(Self {
@@ -305,6 +395,7 @@ impl VulkanDevice {
             graphics_pipeline,
             vertex_buffer,
             index_buffer,
+            descriptor_set,
         })
     }
 
@@ -326,5 +417,9 @@ impl VulkanDevice {
 
     pub fn index_buffer(&self) -> &Subbuffer<[u32]> {
         &self.index_buffer
+    }
+
+    pub fn descriptor_set(&self) -> &Arc<PersistentDescriptorSet> {
+        &self.descriptor_set
     }
 }
