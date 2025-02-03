@@ -22,7 +22,7 @@ use vulkano::{
 };
 use winit::window::Window;
 
-use crate::{error::Result, shader::vs, vulkan_device::VulkanDevice};
+use crate::{error::Result, index_buffer, shader::vs, vulkan_device::VulkanDevice};
 
 pub struct VulkanRenderer {
     pub vulkan_device: Arc<VulkanDevice>,
@@ -342,7 +342,6 @@ impl VulkanRenderer {
             .set_viewport(0, [viewport.clone()].into_iter().collect())?
             .bind_pipeline_graphics(Arc::clone(&self.vulkan_device.graphics_pipeline()))?
             .bind_vertex_buffers(0, self.vulkan_device.vertex_buffer.clone())?
-            .bind_index_buffer(self.vulkan_device.index_buffer().clone())?
             .bind_descriptor_sets(
                 PipelineBindPoint::Graphics,
                 Arc::clone(self.vulkan_device.graphics_pipeline().layout()),
@@ -353,10 +352,16 @@ impl VulkanRenderer {
                 Arc::clone(&self.vulkan_device.graphics_pipeline().layout()),
                 0,
                 push_constants,
-            )?
+            )?;
             // We add a draw command.
-            //            .draw(self.vulkan_device.vertex_buffer.len() as u32, 1, 0, 0)?
-            .draw_indexed(self.vulkan_device.index_buffer.len() as u32, 1, 0, 0, 0)?
+            // Condition whether index buffer are present or not
+            match self.vulkan_device.index_buffer() {
+                Some(index_buffer) => {
+                         builder.bind_index_buffer(index_buffer.clone())?
+                                .draw_indexed(index_buffer.len() as u32, 1, 0, 0, 0)?
+                },
+                None => {builder.draw(self.vulkan_device.vertex_buffer.len() as u32, 1, 0, 0)?},
+            }            
             // We leave the render pass.
             .end_rendering()?;
 

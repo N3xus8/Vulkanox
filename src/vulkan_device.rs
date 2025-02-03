@@ -51,6 +51,7 @@ use crate::{
     mesh::MeshBuilder,
     shader::{self, fs, vs},
     vulkan_instance::VulkanInstance,
+    index_buffer::setup_index_buffers,
 };
 pub struct VulkanDevice {
     pub queue: Arc<Queue>,
@@ -58,7 +59,7 @@ pub struct VulkanDevice {
     command_allocator: Arc<StandardCommandBufferAllocator>,
     graphics_pipeline: Arc<GraphicsPipeline>,
     pub vertex_buffer: Subbuffer<[shader::Vertex]>,
-    pub index_buffer: Subbuffer<[u32]>,
+    pub index_buffer: Option<Subbuffer<[u32]>>,
     pub descriptor_set: Arc<PersistentDescriptorSet>,
 }
 
@@ -133,9 +134,9 @@ impl VulkanDevice {
         let vertices = gltf_mesh.vertices()?;
         let indices = gltf_mesh.indices();
         let vertices_length = vertices.len();
-        let indices_length = indices.len();
+        // let indices_length = indices.len();
 
-        let indices: Vec<u32> = indices.iter().map(|id| *id as u32).collect();
+        // let indices: Vec<u32> = indices.iter().map(|id| *id as u32).collect();
 
         // <---  -S T A G I N G  B U F F E R S-
         // Create a Staging Vertex buffer  : subbuffer<[Vertex]>
@@ -152,22 +153,6 @@ impl VulkanDevice {
             },
             vertices,
         )?;
-
-        // Create an Staging index buffer : subbuffer<[u32]>
-
-        let index_staging_buffer = Buffer::from_iter(
-            memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_HOST,
-                ..Default::default()
-            },
-            indices,
-        )?;
-        // --->
 
         // Create a Vertex buffer  : subbuffer<[Vertex]>
 
@@ -187,23 +172,9 @@ impl VulkanDevice {
             vertices_length as DeviceSize,
         )?;
 
-        // Create an index buffer : subbuffer<[u32]>
-
-        let index_buffer = Buffer::new_slice(
-            memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::INDEX_BUFFER | BufferUsage::TRANSFER_DST,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter {
-                    required_flags: MemoryPropertyFlags::DEVICE_LOCAL, // Make sure this buffer is on the Device=GPU
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-            indices_length as DeviceSize,
-        )?;
+        // Condition: whether the GTLF contains indices or not?
+        // Option for index staging buffer and index buffer
+        let (index_staging_buffer, index_buffer) = setup_index_buffers(indices, memory_allocator.clone())?;
 
         // <----
         // Camera
@@ -270,10 +241,27 @@ impl VulkanDevice {
             vertex_staging_buffer,
             vertex_buffer.clone(),
         ))?;
-        command_builder.copy_buffer(CopyBufferInfo::buffers(
-            index_staging_buffer,
-            index_buffer.clone(),
-        ))?;
+
+        // Condition on index buffer existence
+        // 2 "actions" here
+        // if yes copy_buffer command index staging buffer and index_buffer is Some 
+        // otherwise no copy_buffer command and index_buffer option = None
+        let index_buffer = match index_buffer {
+            Some(index_buffer) => {  
+                                match index_staging_buffer {
+                                    Some(index_staging_buffer) => {
+                                        
+                                    command_builder.copy_buffer(CopyBufferInfo::buffers(
+                                    index_staging_buffer,
+                                    index_buffer.clone(),))?;
+
+                                    Some(index_buffer)
+                                    },
+                                   None => None,
+                                }
+            },
+            None => None
+        };
 
         command_builder.copy_buffer(CopyBufferInfo::buffers(
             uniform_staging_buffer,
@@ -431,7 +419,7 @@ impl VulkanDevice {
         &self.graphics_pipeline
     }
 
-    pub fn index_buffer(&self) -> &Subbuffer<[u32]> {
+    pub fn index_buffer(&self) -> &Option<Subbuffer<[u32]>> {
         &self.index_buffer
     }
 
