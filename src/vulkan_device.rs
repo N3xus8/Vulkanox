@@ -52,6 +52,7 @@ use crate::{
     vulkan_instance::VulkanInstance,
 };
 pub struct VulkanDevice {
+    pub device: Arc<Device>,
     pub queue: Arc<Queue>,
     pub memory_allocator: Arc<StandardMemoryAllocator>,
     command_allocator: Arc<StandardCommandBufferAllocator>,
@@ -60,6 +61,8 @@ pub struct VulkanDevice {
     pub index_buffer: Option<Subbuffer<[u32]>>,
     pub descriptor_set: Arc<PersistentDescriptorSet>,
     pub vulkan_context: Arc<VulkanContext>,
+    pub uniform_staging_buffer: Subbuffer<CameraUniform>,
+    pub uniform_buffer: Subbuffer<CameraUniform>,
 }
 
 impl VulkanDevice {
@@ -248,7 +251,7 @@ impl VulkanDevice {
         };
 
         command_builder.copy_buffer(CopyBufferInfo::buffers(
-            uniform_staging_buffer,
+            uniform_staging_buffer.clone(),
             uniform_buffer.clone(),
         ))?;
 
@@ -370,13 +373,14 @@ impl VulkanDevice {
                     .get(0)
                     .expect("error getting the layout"),
             ),
-            [WriteDescriptorSet::buffer(0, uniform_buffer)],
+            [WriteDescriptorSet::buffer(0, uniform_buffer.clone())],
             [],
         )?;
 
         buffers_upload_future.wait(None)?; // Not sure this works? Is this needed
 
         Ok(Self {
+            device,
             queue,
             memory_allocator,
             command_allocator,
@@ -385,6 +389,8 @@ impl VulkanDevice {
             index_buffer,
             descriptor_set,
             vulkan_context,
+            uniform_staging_buffer,
+            uniform_buffer,
         })
     }
 
@@ -414,5 +420,31 @@ impl VulkanDevice {
 
     pub fn vulkan_context(&self) -> &Arc<VulkanContext> {
         &self.vulkan_context()
+    }
+
+    pub fn update_uniform_buffer(&self) -> Result<()> {
+
+        *self.uniform_staging_buffer.write()? = *self.vulkan_context.camera_uniform().borrow();
+
+        let mut command_builder = AutoCommandBufferBuilder::primary(
+            &self.command_allocator,
+            self.queue.queue_family_index(),
+            CommandBufferUsage::OneTimeSubmit,
+        )?;
+
+        command_builder.copy_buffer(CopyBufferInfo::buffers(
+            self.uniform_staging_buffer.clone(),
+            self.uniform_buffer.clone(),
+        ))?;
+
+        let command_buffer = command_builder.build()?;
+
+        // submit command
+        let buffers_upload_future = sync::now(Arc::clone(&self.device))
+            .then_execute(Arc::clone(&self.queue), command_buffer)?
+            .then_signal_fence_and_flush()?;
+
+            buffers_upload_future.wait(None)?;
+        Ok(())
     }
 }

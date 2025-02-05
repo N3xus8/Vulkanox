@@ -151,6 +151,8 @@ impl VisualSystem {
 
        // println!("{:#?}", self.vulkan_device.vulkan_context.camera.borrow().aspect);
        // println!("{:#?}", self.vulkan_device.vulkan_context.camera_uniform.borrow().view_projection);
+       self.vulkan_device.update_uniform_buffer()?;
+
         Ok(())
     }
 
@@ -241,7 +243,7 @@ impl App {
                 } else {
                     self.is_app_started = true;
 
-                    self.start(window_target).unwrap();
+                    self.start(window_target).expect("failed to start");
                 }
             }
 
