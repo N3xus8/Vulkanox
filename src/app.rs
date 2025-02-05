@@ -1,14 +1,21 @@
-use std::{cell::RefCell, collections::BTreeMap, sync::Arc};
+use std::{
+    cell::RefCell,
+    collections::BTreeMap,
+    sync::Arc,
+};
 
-use vulkano::image::ImageUsage;
+use vulkano::image::{ImageUsage, SampleCount};
 use winit::{
+    dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::{EventLoop, EventLoopWindowTarget},
     window::{Window, WindowBuilder, WindowId},
 };
 
 use crate::{
+    camera::{Camera, CameraUniform},
     error::{self, Result},
+    vulkan_context::VulkanContext,
     vulkan_device::VulkanDevice,
     vulkan_instance::VulkanInstance,
     vulkan_renderer::VulkanRenderer,
@@ -38,8 +45,21 @@ impl VisualSystem {
                 .map_err(|_| error::VisualSystemError::ErrorCreatingVulkanInstance)?,
         );
 
+        let camera = Arc::new(RefCell::new(Camera::default()));
+
+        let mut camera_uniform = CameraUniform::new();
+        camera_uniform.update_view_proj(&camera.borrow());
+
+        let samples = SampleCount::Sample4;
+
+        let vulkan_context = Arc::new(VulkanContext::new(
+            camera,
+            Arc::new(RefCell::new(camera_uniform)),
+            samples,
+        )?);
+
         let vulkan_device = Arc::new(
-            VulkanDevice::new(Arc::clone(&vulkan_instance))
+            VulkanDevice::new(Arc::clone(&vulkan_instance), Arc::clone(&vulkan_context))
                 .map_err(|_| error::VisualSystemError::ErrorCreatingVulkanDevice)?,
         );
 
@@ -115,8 +135,23 @@ impl VisualSystem {
         self.vulkan_renderers.clear(); // Clear the renderers in the BTreeMap
     }
 
-    pub fn resize(&mut self, window_id: WindowId) -> Result<()> {
-        self.vulkan_renderers[&window_id].borrow_mut().recreate() // Use RefCell fo interior mutability
+    pub fn resize(&mut self, window_id: WindowId, new_size: PhysicalSize<u32>) -> Result<()> {
+        self.vulkan_renderers[&window_id].borrow_mut().recreate()?; // Use RefCell fo interior mutability
+
+        self.vulkan_device
+            .vulkan_context
+            .camera
+            .borrow_mut()
+            .update_aspect(new_size.width.into(), new_size.height.into());
+        self.vulkan_device
+            .vulkan_context
+            .camera_uniform
+            .borrow_mut()
+            .update_view_proj(&self.vulkan_device.vulkan_context.camera.borrow());
+
+       // println!("{:#?}", self.vulkan_device.vulkan_context.camera.borrow().aspect);
+       // println!("{:#?}", self.vulkan_device.vulkan_context.camera_uniform.borrow().view_projection);
+        Ok(())
     }
 
     pub fn draw(&mut self, window_id: WindowId) -> Result<()> {
@@ -182,12 +217,12 @@ impl App {
                         window_target.exit()
                     }
                 }
-                WindowEvent::Resized(_) => {
+                WindowEvent::Resized(new_size) => {
                     self.visual_system
                         .as_mut()
                         .unwrap()
-                        .resize(window_id)
-                        .map_err(|_| error::VisualSystemError::ErrorResizingVisualSystem)?
+                        .resize(window_id, new_size)
+                        .map_err(|_| error::VisualSystemError::ErrorResizingVisualSystem)?;
                 }
 
                 WindowEvent::RedrawRequested => self

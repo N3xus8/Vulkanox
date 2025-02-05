@@ -6,12 +6,13 @@ use winit::event_loop::EventLoopBuilder;
 
 mod app;
 mod camera;
+mod index_buffer;
 mod mesh;
 mod shader;
+mod vulkan_context;
 mod vulkan_device;
 mod vulkan_instance;
 mod vulkan_renderer;
-mod index_buffer;
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt::init();

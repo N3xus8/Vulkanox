@@ -10,7 +10,7 @@ use vulkano::{
     },
     device::DeviceOwned,
     format::{ClearValue, Format},
-    image::{view::ImageView, Image, ImageCreateInfo, ImageType, ImageUsage, SampleCount},
+    image::{view::ImageView, Image, ImageCreateInfo, ImageType, ImageUsage},
     memory::allocator::AllocationCreateInfo,
     pipeline::{graphics::viewport::Viewport, Pipeline, PipelineBindPoint},
     render_pass::{AttachmentLoadOp, AttachmentStoreOp},
@@ -103,7 +103,7 @@ impl VulkanRenderer {
                 format: swapchain.image_format(),
                 extent: [swapchain.image_extent()[0], swapchain.image_extent()[1], 1],
                 usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT, // transient image
-                samples: SampleCount::Sample4,
+                samples: vulkan_device.vulkan_context.samples,
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -119,7 +119,7 @@ impl VulkanRenderer {
                 format: Format::D16_UNORM,
                 extent: [swapchain.image_extent()[0], swapchain.image_extent()[1], 1],
                 usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
-                samples: SampleCount::Sample4, // Match intermediary
+                samples: vulkan_device.vulkan_context.samples, // Match intermediary
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -180,7 +180,7 @@ impl VulkanRenderer {
                     1,
                 ],
                 usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT, // transient image
-                samples: SampleCount::Sample4,
+                samples: self.vulkan_device.vulkan_context.samples,
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -197,7 +197,7 @@ impl VulkanRenderer {
                     1,
                 ],
                 usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
-                samples: SampleCount::Sample4, // Match intermediary
+                samples: self.vulkan_device.vulkan_context.samples, // Match intermediary
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -353,17 +353,16 @@ impl VulkanRenderer {
                 0,
                 push_constants,
             )?;
-            // We add a draw command.
-            // Condition whether index buffer are present or not
-            match self.vulkan_device.index_buffer() {
-                Some(index_buffer) => {
-                         builder.bind_index_buffer(index_buffer.clone())?
-                                .draw_indexed(index_buffer.len() as u32, 1, 0, 0, 0)?
-                },
-                None => {builder.draw(self.vulkan_device.vertex_buffer.len() as u32, 1, 0, 0)?},
-            }            
-            // We leave the render pass.
-            .end_rendering()?;
+        // We add a draw command.
+        // Condition whether index buffers are present or not
+        match self.vulkan_device.index_buffer() {
+            Some(index_buffer) => builder
+                .bind_index_buffer(index_buffer.clone())?
+                .draw_indexed(index_buffer.len() as u32, 1, 0, 0, 0)?,
+            None => builder.draw(self.vulkan_device.vertex_buffer.len() as u32, 1, 0, 0)?,
+        }
+        // We leave the render pass.
+        .end_rendering()?;
 
         let command_buffer = builder.build()?;
 

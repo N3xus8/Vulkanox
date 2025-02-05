@@ -1,3 +1,5 @@
+use std::{f32::consts::FRAC_PI_4, sync::Arc};
+
 use bytemuck::{Pod, Zeroable};
 use winit::{
     event::{ElementState, KeyEvent, WindowEvent},
@@ -31,6 +33,30 @@ pub struct Camera {
 }
 
 impl Camera {
+    pub fn new(
+        // position the camera 1 unit up and 2 units back
+        // +z is out of the screen
+        eye: nalgebra::Point3<f32>,
+        // have it look at the origin
+        target: nalgebra::Point3<f32>,
+        // which way is "up"
+        up: nalgebra::Vector3<f32>,
+        aspect: f32,
+        fovy: f32,
+        znear: f32,
+        zfar: f32,
+    ) -> Self {
+        Self {
+            eye,
+            target,
+            up,
+            aspect,
+            fovy,
+            znear,
+            zfar,
+        }
+    }
+
     pub fn build_view_projection_matrix(&self) -> nalgebra::Matrix4<f32> {
         // 1.
         let view = nalgebra::Matrix4::look_at_rh(&self.eye, &self.target, &self.up);
@@ -41,12 +67,31 @@ impl Camera {
         // Convert Perspective3 to Matrix4
         GLTF_TO_VULKAN_MATRIX * projection.as_matrix() * view
     }
+
+    pub fn update_aspect(&mut self, width: u32, height: u32) {
+
+        self.aspect = width as f32 / height.max(1) as f32  ;
+    }
+}
+
+impl Default for Camera {
+    fn default() -> Self {
+        Self {
+            eye: nalgebra::Point3::new(0.97, 0.97, 1.97),
+            target: nalgebra::Point3::new(0.0, 0.0, 0.0),
+            up: nalgebra::Vector3::y(),
+            aspect: 800 as f32 / 600 as f32,
+            fovy: FRAC_PI_4,
+            znear: 0.1,
+            zfar: 100.0,
+        }
+    }
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
 pub struct CameraUniform {
-    view_projection: [[f32; 4]; 4],
+    pub view_projection: [[f32; 4]; 4],
 }
 
 impl CameraUniform {

@@ -1,9 +1,6 @@
 // Note: Logical Device
 
-use std::{
-    f32::consts::{FRAC_PI_2, FRAC_PI_4, PI},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use vulkano::{
     buffer::{
@@ -48,10 +45,11 @@ use vulkano::{
 use crate::{
     camera::{Camera, CameraUniform},
     error::Result,
+    index_buffer::setup_index_buffers,
     mesh::MeshBuilder,
     shader::{self, fs, vs},
+    vulkan_context::VulkanContext,
     vulkan_instance::VulkanInstance,
-    index_buffer::setup_index_buffers,
 };
 pub struct VulkanDevice {
     pub queue: Arc<Queue>,
@@ -61,10 +59,11 @@ pub struct VulkanDevice {
     pub vertex_buffer: Subbuffer<[shader::Vertex]>,
     pub index_buffer: Option<Subbuffer<[u32]>>,
     pub descriptor_set: Arc<PersistentDescriptorSet>,
+    pub vulkan_context: Arc<VulkanContext>,
 }
 
 impl VulkanDevice {
-    pub fn new(instance: Arc<VulkanInstance>) -> Result<Self> {
+    pub fn new(instance: Arc<VulkanInstance>, vulkan_context: Arc<VulkanContext>) -> Result<Self> {
         let physical_device = instance.physical_device();
         let queue_family_index = instance.queue_family_index();
         let device_extensions = instance.device_extensions();
@@ -174,29 +173,16 @@ impl VulkanDevice {
 
         // Condition: whether the GTLF contains indices or not?
         // Option for index staging buffer and index buffer
-        let (index_staging_buffer, index_buffer) = setup_index_buffers(indices, memory_allocator.clone())?;
+        let (index_staging_buffer, index_buffer) =
+            setup_index_buffers(indices, memory_allocator.clone())?;
 
         // <----
         // Camera
         // ----->
 
         // Camera setup
-        let camera = Camera {
-            // position the camera 1 unit up and 2 units back
-            // +z is out of the screen
-            eye: nalgebra::Point3::new(0.97, 0.97, 1.97),
-            // have it look at the origin
-            target: nalgebra::Point3::new(0.0, 0.0, 0.0),
-            // which way is "up"
-            up: nalgebra::Vector3::y(),
-            aspect: 800 as f32 / 600 as f32, // ⚠ Caution! Hard Coded , Bad ! Bad !
-            fovy: FRAC_PI_4,
-            znear: 0.1,
-            zfar: 100.0,
-        };
 
-        let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update_view_proj(&camera);
+        let camera_uniform = vulkan_context.camera_uniform().clone();
 
         let uniform_staging_buffer_allocator = SubbufferAllocator::new(
             memory_allocator.clone(),
@@ -219,7 +205,7 @@ impl VulkanDevice {
 
         let uniform_staging_buffer: Subbuffer<CameraUniform> =
             uniform_staging_buffer_allocator.allocate_sized()?;
-        *uniform_staging_buffer.write()? = camera_uniform;
+        *uniform_staging_buffer.write()? = *camera_uniform.borrow();
 
         let uniform_buffer: Subbuffer<CameraUniform> =
             uniform_buffer_allocator.allocate_sized().unwrap();
@@ -244,23 +230,21 @@ impl VulkanDevice {
 
         // Condition on index buffer existence
         // 2 "actions" here
-        // if yes copy_buffer command index staging buffer and index_buffer is Some 
+        // if yes copy_buffer command index staging buffer and index_buffer is Some
         // otherwise no copy_buffer command and index_buffer option = None
         let index_buffer = match index_buffer {
-            Some(index_buffer) => {  
-                                match index_staging_buffer {
-                                    Some(index_staging_buffer) => {
-                                        
-                                    command_builder.copy_buffer(CopyBufferInfo::buffers(
-                                    index_staging_buffer,
-                                    index_buffer.clone(),))?;
+            Some(index_buffer) => match index_staging_buffer {
+                Some(index_staging_buffer) => {
+                    command_builder.copy_buffer(CopyBufferInfo::buffers(
+                        index_staging_buffer,
+                        index_buffer.clone(),
+                    ))?;
 
-                                    Some(index_buffer)
-                                    },
-                                   None => None,
-                                }
+                    Some(index_buffer)
+                }
+                None => None,
             },
-            None => None
+            None => None,
         };
 
         command_builder.copy_buffer(CopyBufferInfo::buffers(
@@ -358,7 +342,7 @@ impl VulkanDevice {
                     //Original without MSAA 👉 multisample_state: Some(MultisampleState::default()),
                     multisample_state: Some(MultisampleState {
                         // MSAA
-                        rasterization_samples: SampleCount::Sample4,
+                        rasterization_samples: vulkan_context.samples, //SampleCount::Sample4,
                         ..Default::default()
                     }),
                     // How pixel values are combined with the values already present in the framebuffer.
@@ -400,6 +384,7 @@ impl VulkanDevice {
             vertex_buffer,
             index_buffer,
             descriptor_set,
+            vulkan_context,
         })
     }
 
@@ -425,5 +410,9 @@ impl VulkanDevice {
 
     pub fn descriptor_set(&self) -> &Arc<PersistentDescriptorSet> {
         &self.descriptor_set
+    }
+
+    pub fn vulkan_context(&self) -> &Arc<VulkanContext> {
+        &self.vulkan_context()
     }
 }
