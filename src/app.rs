@@ -36,7 +36,7 @@ impl VisualSystem {
             WindowBuilder::new()
                 .with_title("🌋VULKANO ♣")
                 .with_visible(false)
-                .build(&window_target)?,
+                .build(window_target)?,
         );
         let primary_window_id = primary_window.id();
 
@@ -91,7 +91,7 @@ impl VisualSystem {
                 Arc::new(RefCell::new(
                     VulkanRenderer::new(
                         Arc::clone(&vulkan_device),
-                        Arc::clone(&window),
+                        Arc::clone(window),
                         ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSFER_DST,
                     )
                     .map_err(|_| error::VisualSystemError::ErrorCreatingVulkanRenderer)?,
@@ -113,7 +113,7 @@ impl VisualSystem {
     }
 
     // Resume create a new renderer. Keep device and window
-    pub fn resume<T>(&mut self, window_target: &EventLoopWindowTarget<T>) -> Result<()> {
+    pub fn resume<T>(&mut self, _window_target: &EventLoopWindowTarget<T>) -> Result<()> {
         for (window_id, window) in &self.windows {
             self.vulkan_renderers.insert(
                 *window_id,
@@ -121,7 +121,7 @@ impl VisualSystem {
                     VulkanRenderer::new(
                         // Use RefCell fo interior mutability
                         Arc::clone(&self.vulkan_device),
-                        Arc::clone(&window),
+                        Arc::clone(window),
                         ImageUsage::COLOR_ATTACHMENT,
                     )
                     .map_err(|_| error::VisualSystemError::ErrorCreatingVulkanRenderer)?,
@@ -142,7 +142,7 @@ impl VisualSystem {
             .vulkan_context
             .camera
             .borrow_mut()
-            .update_aspect(new_size.width.into(), new_size.height.into());
+            .update_aspect(new_size.width, new_size.height);
         self.vulkan_device
             .vulkan_context
             .camera_uniform
@@ -174,7 +174,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new<T>(event_loop: &EventLoop<T>) -> Result<Self> {
+    pub fn new<T>(_event_loop: &EventLoop<T>) -> Result<Self> {
         Ok(Self {
             is_app_started: false,
             visual_system: None,

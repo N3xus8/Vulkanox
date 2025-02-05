@@ -80,7 +80,7 @@ impl Default for Camera {
             eye: nalgebra::Point3::new(0.97, 0.97, 1.97),
             target: nalgebra::Point3::new(0.0, 0.0, 0.0),
             up: nalgebra::Vector3::y(),
-            aspect: 800 as f32 / 600 as f32,
+            aspect: 800_f32 / 600_f32,
             fovy: FRAC_PI_4,
             znear: 0.1,
             zfar: 100.0,

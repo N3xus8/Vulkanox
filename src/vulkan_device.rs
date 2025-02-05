@@ -13,12 +13,10 @@ use vulkano::{
     },
     descriptor_set::{
         allocator::{StandardDescriptorSetAllocator, StandardDescriptorSetAllocatorCreateInfo},
-        layout::DescriptorSetLayout,
         PersistentDescriptorSet, WriteDescriptorSet,
     },
     device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo},
     format::Format,
-    image::SampleCount,
     memory::{
         allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
         MemoryPropertyFlags,
@@ -43,7 +41,7 @@ use vulkano::{
 };
 
 use crate::{
-    camera::{Camera, CameraUniform},
+    camera::CameraUniform,
     error::Result,
     index_buffer::setup_index_buffers,
     mesh::MeshBuilder,
@@ -76,7 +74,7 @@ impl VulkanDevice {
         // An iterator of created queues is returned by the function alongside the device.
         let (device, mut queues) = Device::new(
             // Which physical device to connect to.
-            Arc::clone(&physical_device),
+            Arc::clone(physical_device),
             DeviceCreateInfo {
                 // The list of queues that we are going to use. Here we only use one queue, from the
                 // previously chosen queue family.
@@ -370,7 +368,7 @@ impl VulkanDevice {
                 graphics_pipeline
                     .layout()
                     .set_layouts()
-                    .get(0)
+                    .first()
                     .expect("error getting the layout"),
             ),
             [WriteDescriptorSet::buffer(0, uniform_buffer.clone())],

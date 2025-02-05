@@ -89,12 +89,12 @@ impl MeshBuilder {
         }
 
         //let indices = if indices.len() == 0 { None } else {Some(indices)};
-        let normals = if normals.len() == 0 {
+        let normals = if normals.is_empty() {
             None
         } else {
             Some(normals)
         };
-        let uvs = if uvs.len() == 0 { None } else { Some(uvs) };
+        let uvs = if uvs.is_empty() { None } else { Some(uvs) };
 
         Ok(MeshBuilder {
             positions: positions,

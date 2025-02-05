@@ -1,6 +1,6 @@
 // Note: Renderer
 
-use std::{sync::Arc, time::Instant, u32};
+use std::{sync::Arc, time::Instant};
 
 use palette::Srgba;
 use vulkano::{
@@ -22,7 +22,7 @@ use vulkano::{
 };
 use winit::window::Window;
 
-use crate::{error::Result, index_buffer, shader::vs, vulkan_device::VulkanDevice};
+use crate::{error::Result, shader::vs, vulkan_device::VulkanDevice};
 
 pub struct VulkanRenderer {
     pub vulkan_device: Arc<VulkanDevice>,
@@ -47,7 +47,7 @@ impl VulkanRenderer {
         let instance = device.instance();
 
         // create the surface of the window
-        let surface = Surface::from_window(Arc::clone(&instance), Arc::clone(&window))?;
+        let surface = Surface::from_window(Arc::clone(instance), Arc::clone(&window))?;
 
         // SWAPCHAIN
         // Before we can draw on the surface, we have to create what is called a swapchain. Creating a
@@ -69,7 +69,7 @@ impl VulkanRenderer {
         // create the swapchain
 
         let (swapchain, swapchain_images) = Swapchain::new(
-            Arc::clone(&device),
+            Arc::clone(device),
             surface,
             SwapchainCreateInfo {
                 image_extent: surface_capabilities
@@ -79,7 +79,7 @@ impl VulkanRenderer {
                 min_image_count: (surface_capabilities.min_image_count + 1)
                     .min(surface_capabilities.max_image_count.unwrap_or(u32::MAX)),
                 pre_transform: surface_capabilities.current_transform,
-                image_usage: image_usage,
+                image_usage,
                 ..Default::default()
             },
         )?;
@@ -151,7 +151,7 @@ impl VulkanRenderer {
             .swapchain
             .device()
             .physical_device()
-            .surface_capabilities(&self.swapchain.surface(), Default::default())?;
+            .surface_capabilities(self.swapchain.surface(), Default::default())?;
 
         self.swapchain_images.clear();
         self.swapchain_image_views.clear();
@@ -340,16 +340,16 @@ impl VulkanRenderer {
             //
             // TODO: Document state setting and how it affects subsequent draw commands.
             .set_viewport(0, [viewport.clone()].into_iter().collect())?
-            .bind_pipeline_graphics(Arc::clone(&self.vulkan_device.graphics_pipeline()))?
+            .bind_pipeline_graphics(Arc::clone(self.vulkan_device.graphics_pipeline()))?
             .bind_vertex_buffers(0, self.vulkan_device.vertex_buffer.clone())?
             .bind_descriptor_sets(
                 PipelineBindPoint::Graphics,
                 Arc::clone(self.vulkan_device.graphics_pipeline().layout()),
                 0,
-                Arc::clone(&self.vulkan_device.descriptor_set()),
+                Arc::clone(self.vulkan_device.descriptor_set()),
             )?
             .push_constants(
-                Arc::clone(&self.vulkan_device.graphics_pipeline().layout()),
+                Arc::clone(self.vulkan_device.graphics_pipeline().layout()),
                 0,
                 push_constants,
             )?;
@@ -402,12 +402,12 @@ impl VulkanRenderer {
             Err(VulkanError::OutOfDate) => {
                 self.recreate()?;
                 self.previous_frame_end =
-                    Some(sync::now(Arc::clone(&self.swapchain.device())).boxed());
+                    Some(sync::now(Arc::clone(self.swapchain.device())).boxed());
             }
             Err(e) => {
                 println!("failed to flush future: {e}");
                 self.previous_frame_end =
-                    Some(sync::now(Arc::clone(&self.swapchain.device())).boxed());
+                    Some(sync::now(Arc::clone(self.swapchain.device())).boxed());
             }
         }
 
