@@ -1,9 +1,8 @@
 use std::{
-    cell::RefCell,
-    collections::BTreeMap,
-    sync::Arc,
+    cell::RefCell, collections::BTreeMap, sync::{Arc, Mutex}
 };
 
+use tracing::info;
 use vulkano::image::{ImageUsage, SampleCount};
 use winit::{
     dpi::PhysicalSize,
@@ -13,7 +12,7 @@ use winit::{
 };
 
 use crate::{
-    camera::{Camera, CameraUniform},
+    camera::{Camera, CameraController, CameraUniform},
     error::{self, Result},
     vulkan_context::VulkanContext,
     vulkan_device::VulkanDevice,
@@ -26,7 +25,7 @@ pub struct VisualSystem {
     windows: BTreeMap<WindowId, Arc<Window>>,
     vulkan_instance: Arc<VulkanInstance>,
     vulkan_device: Arc<VulkanDevice>,
-    vulkan_renderers: BTreeMap<WindowId, Arc<RefCell<VulkanRenderer>>>,
+    vulkan_renderers: BTreeMap<WindowId, Arc<Mutex<VulkanRenderer>>>,
 }
 
 impl VisualSystem {
@@ -45,18 +44,21 @@ impl VisualSystem {
                 .map_err(|_| error::VisualSystemError::ErrorCreatingVulkanInstance)?,
         );
 
-        let camera = Arc::new(RefCell::new(Camera::default()));
+        let camera = Arc::new(Mutex::new(Camera::default()));
+
+        let camera_controller = Arc::new(Mutex::new(CameraController::new(0.2)));
 
         let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update_view_proj(&camera.borrow());
+        camera_uniform.update_view_proj(&camera.lock().unwrap());
 
         let samples = SampleCount::Sample4;
 
-        let vulkan_context = Arc::new(VulkanContext::new(
+        let vulkan_context = Arc::new(RefCell::new(VulkanContext::new(
             camera,
-            Arc::new(RefCell::new(camera_uniform)),
+            Arc::new(Mutex::new(camera_uniform)),
+            camera_controller,
             samples,
-        )?);
+        )?));
 
         let vulkan_device = Arc::new(
             VulkanDevice::new(Arc::clone(&vulkan_instance), Arc::clone(&vulkan_context))
@@ -88,7 +90,7 @@ impl VisualSystem {
         for (window_id, window) in &windows {
             vulkan_renderers.insert(
                 *window_id,
-                Arc::new(RefCell::new(
+                Arc::new(Mutex::new(
                     VulkanRenderer::new(
                         Arc::clone(&vulkan_device),
                         Arc::clone(window),
@@ -117,9 +119,9 @@ impl VisualSystem {
         for (window_id, window) in &self.windows {
             self.vulkan_renderers.insert(
                 *window_id,
-                Arc::new(RefCell::new(
+                Arc::new(Mutex::new(
                     VulkanRenderer::new(
-                        // Use RefCell fo interior mutability
+                        // Use Mutex fo interior mutability
                         Arc::clone(&self.vulkan_device),
                         Arc::clone(window),
                         ImageUsage::COLOR_ATTACHMENT,
@@ -136,28 +138,78 @@ impl VisualSystem {
     }
 
     pub fn resize(&mut self, window_id: WindowId, new_size: PhysicalSize<u32>) -> Result<()> {
-        self.vulkan_renderers[&window_id].borrow_mut().recreate()?; // Use RefCell fo interior mutability
+        self.vulkan_renderers[&window_id]
+            .lock()
+            .expect("failed to get a lock on vulkan renderer")
+            .recreate()?; // Use Mutex fo interior mutability
 
+        // update camera aspect ratio
         self.vulkan_device
-            .vulkan_context
+            .vulkan_context.borrow()
             .camera
-            .borrow_mut()
+            .lock()
+            .expect("failed to get a lock on camera ")
             .update_aspect(new_size.width, new_size.height);
-        self.vulkan_device
-            .vulkan_context
-            .camera_uniform
-            .borrow_mut()
-            .update_view_proj(&self.vulkan_device.vulkan_context.camera.borrow());
 
-       // println!("{:#?}", self.vulkan_device.vulkan_context.camera.borrow().aspect);
-       // println!("{:#?}", self.vulkan_device.vulkan_context.camera_uniform.borrow().view_projection);
-       self.vulkan_device.update_uniform_buffer()?;
+
+        self.vulkan_device
+            .vulkan_context.borrow()
+            .camera_uniform
+            .lock()
+            .expect("failed to get a lock on camera uniform")
+            .update_view_proj(
+                &self
+                    .vulkan_device
+                    .vulkan_context.borrow()
+                    .camera
+                    .lock()
+                    .unwrap(),
+            );
+
+        self.vulkan_device.update_uniform_buffer()?;
+
+        Ok(())
+    }
+
+    pub fn input(&mut self) -> Result<()> {
+
+                // update camera via camera controller
+                self.vulkan_device
+                .vulkan_context.borrow()
+                .camera_controller
+                .lock()
+                .expect("failed to get a lock on camera controller")
+                .update_camera(
+                    &mut self
+                        .vulkan_device
+                        .vulkan_context.borrow()
+                        .camera
+                        .lock()
+                        .expect("failed to get a lock on camera"),
+                );
+
+        
+                self.vulkan_device
+                .vulkan_context.borrow()
+                .camera_uniform
+                .lock()
+                .expect("failed to get a lock on camera uniform")
+                .update_view_proj(
+                    &self
+                        .vulkan_device
+                        .vulkan_context.borrow()
+                        .camera
+                        .lock()
+                        .unwrap(),
+                );
+    
+            self.vulkan_device.update_uniform_buffer()?;
 
         Ok(())
     }
 
     pub fn draw(&mut self, window_id: WindowId) -> Result<()> {
-        self.vulkan_renderers[&window_id].borrow_mut().render()
+        self.vulkan_renderers[&window_id].lock().unwrap().render()
     }
 
     pub fn request_redraw(&mut self) -> Result<()> {
@@ -213,29 +265,48 @@ impl App {
         window_target: &EventLoopWindowTarget<()>,
     ) -> Result<()> {
         match event {
-            Event::WindowEvent { window_id, event } => match event {
-                WindowEvent::CloseRequested => {
-                    if self.visual_system.as_ref().unwrap().primary_window_id == window_id {
-                        window_target.exit()
-                    }
-                }
-                WindowEvent::Resized(new_size) => {
-                    self.visual_system
-                        .as_mut()
-                        .unwrap()
-                        .resize(window_id, new_size)
-                        .map_err(|_| error::VisualSystemError::ErrorResizingVisualSystem)?;
-                }
-
-                WindowEvent::RedrawRequested => self
+            Event::WindowEvent { window_id, event } => {
+                if !self
                     .visual_system
                     .as_mut()
                     .unwrap()
-                    .draw(window_id)
-                    .map_err(|_| error::VisualSystemError::ErrorDrawingVisualSystem)?,
+                    .vulkan_device
+                    .vulkan_context
+                    .borrow_mut()
+                    .input(&event)
+                {
+                    match event {
+                        WindowEvent::CloseRequested => {
+                            if self.visual_system.as_ref().unwrap().primary_window_id == window_id {
+                                info!("The close button was pressed; stopping \u{2B22}");
+                                window_target.exit()
+                            }
+                        }
+                        WindowEvent::Resized(new_size) => {
+                            self.visual_system
+                                .as_mut()
+                                .unwrap()
+                                .resize(window_id, new_size)
+                                .map_err(|_| error::VisualSystemError::ErrorResizingVisualSystem)?;
+                        }
 
-                _ => {}
-            },
+                        WindowEvent::RedrawRequested => self
+                            .visual_system
+                            .as_mut()
+                            .unwrap()
+                            .draw(window_id)
+                            .map_err(|_| error::VisualSystemError::ErrorDrawingVisualSystem)?,
+
+                        _ => {}
+                    }
+                } else { 
+                    self
+                    .visual_system
+                    .as_mut()
+                    .unwrap()
+                    .input()
+                    .map_err(|_| error::VisualSystemError::ErrorInputVisualSystem)?}
+            } 
 
             Event::Resumed => {
                 if self.is_app_started {

@@ -22,6 +22,8 @@ pub enum VisualSystemError {
     ErrorCreatingVulkanDevice,
     #[error("error creating new Vulkan renderer: {0}", self)]
     ErrorCreatingVulkanRenderer,
+    #[error("error input visual system: {0}", self)]
+    ErrorInputVisualSystem,
 
     // -- Externals
     #[error("os error")]

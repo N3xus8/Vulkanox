@@ -1,6 +1,6 @@
 // Note: Logical Device
 
-use std::sync::Arc;
+use std::{cell::RefCell, sync::{Arc, Mutex}};
 
 use vulkano::{
     buffer::{
@@ -58,13 +58,16 @@ pub struct VulkanDevice {
     pub vertex_buffer: Subbuffer<[shader::Vertex]>,
     pub index_buffer: Option<Subbuffer<[u32]>>,
     pub descriptor_set: Arc<PersistentDescriptorSet>,
-    pub vulkan_context: Arc<VulkanContext>,
+    pub vulkan_context: Arc<RefCell<VulkanContext>>,
     pub uniform_staging_buffer: Subbuffer<CameraUniform>,
     pub uniform_buffer: Subbuffer<CameraUniform>,
 }
 
 impl VulkanDevice {
-    pub fn new(instance: Arc<VulkanInstance>, vulkan_context: Arc<VulkanContext>) -> Result<Self> {
+    pub fn new(
+        instance: Arc<VulkanInstance>,
+        vulkan_context: Arc<RefCell<VulkanContext>>,
+    ) -> Result<Self> {
         let physical_device = instance.physical_device();
         let queue_family_index = instance.queue_family_index();
         let device_extensions = instance.device_extensions();
@@ -183,7 +186,9 @@ impl VulkanDevice {
 
         // Camera setup
 
-        let camera_uniform = vulkan_context.camera_uniform().clone();
+        let camera_uniform = vulkan_context.borrow()
+            .camera_uniform()
+            .clone();
 
         let uniform_staging_buffer_allocator = SubbufferAllocator::new(
             memory_allocator.clone(),
@@ -206,7 +211,7 @@ impl VulkanDevice {
 
         let uniform_staging_buffer: Subbuffer<CameraUniform> =
             uniform_staging_buffer_allocator.allocate_sized()?;
-        *uniform_staging_buffer.write()? = *camera_uniform.borrow();
+        *uniform_staging_buffer.write()? = *camera_uniform.lock().unwrap();
 
         let uniform_buffer: Subbuffer<CameraUniform> =
             uniform_buffer_allocator.allocate_sized().unwrap();
@@ -343,7 +348,8 @@ impl VulkanDevice {
                     //Original without MSAA 👉 multisample_state: Some(MultisampleState::default()),
                     multisample_state: Some(MultisampleState {
                         // MSAA
-                        rasterization_samples: vulkan_context.samples, //SampleCount::Sample4,
+                        rasterization_samples: vulkan_context.borrow()
+                            .samples, //SampleCount::Sample4,
                         ..Default::default()
                     }),
                     // How pixel values are combined with the values already present in the framebuffer.
@@ -421,8 +427,11 @@ impl VulkanDevice {
     }
 
     pub fn update_uniform_buffer(&self) -> Result<()> {
-
-        *self.uniform_staging_buffer.write()? = *self.vulkan_context.camera_uniform().borrow();
+        *self.uniform_staging_buffer.write()? = *self
+            .vulkan_context.borrow()
+            .camera_uniform()
+            .lock()
+            .unwrap();
 
         let mut command_builder = AutoCommandBufferBuilder::primary(
             &self.command_allocator,
@@ -442,7 +451,7 @@ impl VulkanDevice {
             .then_execute(Arc::clone(&self.queue), command_buffer)?
             .then_signal_fence_and_flush()?;
 
-            buffers_upload_future.wait(None)?;
+        buffers_upload_future.wait(None)?;
         Ok(())
     }
 }

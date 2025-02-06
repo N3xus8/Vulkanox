@@ -103,7 +103,9 @@ impl VulkanRenderer {
                 format: swapchain.image_format(),
                 extent: [swapchain.image_extent()[0], swapchain.image_extent()[1], 1],
                 usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT, // transient image
-                samples: vulkan_device.vulkan_context.samples,
+                samples: vulkan_device
+                    .vulkan_context.borrow()
+                    .samples,
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -119,7 +121,9 @@ impl VulkanRenderer {
                 format: Format::D16_UNORM,
                 extent: [swapchain.image_extent()[0], swapchain.image_extent()[1], 1],
                 usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
-                samples: vulkan_device.vulkan_context.samples, // Match intermediary
+                samples: vulkan_device
+                    .vulkan_context.borrow()
+                    .samples, // Match intermediary
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -180,7 +184,10 @@ impl VulkanRenderer {
                     1,
                 ],
                 usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT, // transient image
-                samples: self.vulkan_device.vulkan_context.samples,
+                samples: self
+                    .vulkan_device
+                    .vulkan_context.borrow()
+                    .samples,
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -197,7 +204,10 @@ impl VulkanRenderer {
                     1,
                 ],
                 usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
-                samples: self.vulkan_device.vulkan_context.samples, // Match intermediary
+                samples: self
+                    .vulkan_device
+                    .vulkan_context.borrow()
+                    .samples, // Match intermediary
                 ..Default::default()
             },
             AllocationCreateInfo::default(),

@@ -1,36 +1,44 @@
-use std::{cell::RefCell, sync::Arc};
+use std::sync::{Arc, Mutex};
 
 use vulkano::image::SampleCount;
+use winit::event::WindowEvent;
 
 use crate::{
-    camera::{Camera, CameraUniform},
+    camera::{Camera, CameraController, CameraUniform},
     error::Result,
 };
 
 pub struct VulkanContext {
-    pub camera: Arc<RefCell<Camera>>,
-    pub camera_uniform: Arc<RefCell<CameraUniform>>,
+    pub camera: Arc<Mutex<Camera>>,
+    pub camera_uniform: Arc<Mutex<CameraUniform>>,
+    pub camera_controller: Arc<Mutex<CameraController>>,
     pub samples: SampleCount,
 }
 
 impl VulkanContext {
     pub fn new(
-        camera: Arc<RefCell<Camera>>,
-        camera_uniform: Arc<RefCell<CameraUniform>>,
+        camera: Arc<Mutex<Camera>>,
+        camera_uniform: Arc<Mutex<CameraUniform>>,
+        camera_controller: Arc<Mutex<CameraController>>,
         samples: SampleCount,
     ) -> Result<Self> {
         Ok(Self {
             camera,
             camera_uniform,
+            camera_controller,
             samples,
         })
     }
 
-    pub fn camera(&self) -> &Arc<RefCell<Camera>> {
+    pub fn camera(&self) -> &Arc<Mutex<Camera>> {
         &self.camera
     }
 
-    pub fn camera_uniform(&self) -> &Arc<RefCell<CameraUniform>> {
+    pub fn camera_uniform(&self) -> &Arc<Mutex<CameraUniform>> {
         &self.camera_uniform
+    }
+
+    pub fn input(&mut self, event: &WindowEvent) -> bool {
+        self.camera_controller.lock().unwrap().process_events(event)
     }
 }

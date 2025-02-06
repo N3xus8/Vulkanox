@@ -52,8 +52,8 @@ pub fn setup_index_buffers(
             indices_length as DeviceSize,
         )?;
 
-         Ok((Some(index_staging_buffer), Some(index_buffer)))
+        Ok((Some(index_staging_buffer), Some(index_buffer)))
     } else {
-         Ok((None, None))
+        Ok((None, None))
     }
 }

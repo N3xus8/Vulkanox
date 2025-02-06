@@ -97,10 +97,10 @@ impl MeshBuilder {
         let uvs = if uvs.is_empty() { None } else { Some(uvs) };
 
         Ok(MeshBuilder {
-            positions: positions,
-            normals: normals,
-            indices: indices,
-            uvs: uvs,
+            positions,
+            normals,
+            indices,
+            uvs,
         })
     }
 
