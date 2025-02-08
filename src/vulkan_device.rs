@@ -273,7 +273,7 @@ impl VulkanDevice {
         // Ambient Light
 
         let ambient_light = WHITE_AMBIENT_LIGHT;
-
+        //let ambient_light = AmbientLight { color: [0.0, 0.5 , 0.5], intensity: 0.7};
 
         let ambient_light_subbuffer =
             AmbientLight::setup_ambient_light_buffers(ambient_light, memory_allocator.clone())?;
@@ -281,14 +281,14 @@ impl VulkanDevice {
         // Directional Light
 
         let directional_light = DirectionalLight {
-            position: [-4.0, -4.0, 0.0],
-            color: [0.7, 0.63, 0.77],
+            position: [0.0, 0.2, 1.5],
+            color: [ 1.0, 1.0, 0.0],
         };
 
-        let directional_lights = vec![directional_light.clone()];
+        //let directional_light = vec![directional_light.clone()];
 
         let directional_lights_subbuffer = DirectionalLight::setup_directional_light_buffers(
-            directional_lights,
+            directional_light,
             memory_allocator.clone(),
         )?;
 

@@ -58,10 +58,10 @@ pub struct DirectionalLight {
 
 impl DirectionalLight {
     pub fn setup_directional_light_buffers(
-        directional_lights: Vec<DirectionalLight>,
+        directional_light: DirectionalLight,
         memory_allocator: Arc<GenericMemoryAllocator<FreeListAllocator>>,
-    ) -> Result<Subbuffer<[DirectionalLight]>> {
-        let directional_light_buffer = Buffer::from_iter(
+    ) -> Result<Subbuffer<DirectionalLight>> {
+        let directional_light_buffer = Buffer::from_data(
             memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
@@ -72,7 +72,7 @@ impl DirectionalLight {
                     | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                 ..Default::default()
             },
-            directional_lights,
+            directional_light,
         )?;
 
         Ok(directional_light_buffer)

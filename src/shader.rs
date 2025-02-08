@@ -24,8 +24,8 @@ pub mod vs {
                 layout(location = 1) in vec3 normal;
 
                 layout(location = 0) out vec3 fragColor;
-//                layout(location = 1) out vec3 out_normal;
-               // layout(location = 1) in vec3 color;
+                layout(location = 1) out vec3 out_normal;
+                layout(location = 2) out vec3 frag_pos;
 
                layout(set = 0, binding = 0) uniform MVP {
                     mat4 model;
@@ -43,9 +43,10 @@ pub mod vs {
                    // Original gl_Position = vec4(position*sin(pc.time), 1.0);
                    mat4 worldview = uniforms.view * uniforms.model;
                    gl_Position = uniforms.projection * worldview  * vec4(position, 1.0);
-                   // gl_Position = uniforms.projection * uniforms.view * vec4(position, 1.0);
                     //gl_Position =  vec4(position, 1.0);
                     fragColor = position ;
+                    out_normal = mat3(uniforms.model) * normal;
+                    frag_pos = vec3(uniforms.model * vec4(position, 1.0));            
                 }
             ",
     }
@@ -58,6 +59,8 @@ pub mod fs {
                 #version 460
 
                 layout(location = 0) in vec3 fragColor;
+                layout(location = 1) in vec3 in_normal;
+                layout(location = 2) in vec3 frag_pos;
 
                 layout(location = 0) out vec4 outColor;
 
@@ -73,7 +76,10 @@ pub mod fs {
 
                 void main(){
                     vec3 ambient_color = ambient.intensity * ambient.color;
-                    vec3 combined_color = ambient_color * fragColor;
+                    vec3 light_direction = normalize(directional.position - frag_pos);
+                    float directional_intensity = max(dot(in_normal, light_direction), 0.0);
+                    vec3 directional_color = directional_intensity * directional.color;
+                    vec3 combined_color = (ambient_color + directional_color)  * fragColor;
                     outColor = vec4(combined_color, 1.0);
                     //outColor = vec4(fragColor, 1.0);
                 }

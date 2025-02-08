@@ -14,7 +14,7 @@ use winit::{
 };
 
 use crate::{
-    camera::{Camera, CameraController, CameraUniform, MVP},
+    camera::{Camera, CameraController, MVP},
     error::{self, Result},
     vulkan_context::VulkanContext,
     vulkan_device::VulkanDevice,
