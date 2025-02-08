@@ -4,16 +4,27 @@ Based on Codotaku Youtube video.
 
 *https://www.youtube.com/watch?v=Jfc2uK52a10*
 
-Date: February 2025
+_Date: February 2025._
 
 This is **Vulkano** implentation as a tutorial and reference.
-Vulkano version 0.34
+
+Vulkano version 0.34 .
 Winit version 0.29.3
+
+<u>Prerequisites:</u>
+
+Install Vulkan SDK for your platform.
+
+You will need a C/C++ compiler for shader compilation.
+
+<u>Features:</u>
 
 + Multi windows.
 + Read GLTF files for models.
 + Index buffer.
 + Vertex buffer.
++ MVP (Model-View-Projection).
++ MSAA.
 + Staging buffers.
 + Dynamic rendering.
 + Camera & camera controller.

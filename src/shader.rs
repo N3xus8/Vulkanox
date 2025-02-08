@@ -27,8 +27,10 @@ pub mod vs {
 //                layout(location = 1) out vec3 out_normal;
                // layout(location = 1) in vec3 color;
 
-               layout(set = 0, binding = 0) uniform data {
-                    mat4 view_projection;
+               layout(set = 0, binding = 0) uniform MVP {
+                    mat4 model;
+                    mat4 view;
+                    mat4 projection;
                } uniforms;
 
 
@@ -39,7 +41,9 @@ pub mod vs {
 
                 void main() {
                    // Original gl_Position = vec4(position*sin(pc.time), 1.0);
-                    gl_Position = uniforms.view_projection * vec4(position, 1.0);
+                   mat4 worldview = uniforms.view * uniforms.model;
+                   gl_Position = uniforms.projection * worldview  * vec4(position, 1.0);
+                   // gl_Position = uniforms.projection * uniforms.view * vec4(position, 1.0);
                     //gl_Position =  vec4(position, 1.0);
                     fragColor = position ;
                 }

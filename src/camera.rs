@@ -1,20 +1,23 @@
 use std::f32::consts::FRAC_PI_4;
 
 use bytemuck::{Pod, Zeroable};
+
 use winit::{
     event::{ElementState, KeyEvent, WindowEvent},
     keyboard::{KeyCode, PhysicalKey},
 };
+use nalgebra::Matrix4;
 
 #[rustfmt::skip]
-pub const OPENGL_TO_WGPU_MATRIX: nalgebra::Matrix4<f32> = nalgebra::Matrix4::new(
+#[allow(unused)]
+pub const OPENGL_TO_WGPU_MATRIX: Matrix4<f32> = Matrix4::new(
     1.0, 0.0, 0.0, 0.0,
     0.0, 1.0, 0.0, 0.0,
     0.0, 0.0, 0.5, 0.5,
     0.0, 0.0, 0.0, 1.0,
 );
 #[rustfmt::skip]
-pub const GLTF_TO_VULKAN_MATRIX: nalgebra::Matrix4<f32> = nalgebra::Matrix4::new(
+pub const GLTF_TO_VULKAN_MATRIX: Matrix4<f32> = Matrix4::new(
 1. , 0. ,  0. , 0.,
 0., -1.,  0.,  0.,
 0.,  0.,  1.,  0.,
@@ -57,15 +60,29 @@ impl Camera {
         }
     }
 
-    pub fn build_view_projection_matrix(&self) -> nalgebra::Matrix4<f32> {
+    pub fn build_view_projection_matrix(&self) -> Matrix4<f32> {
         // 1.
-        let view = nalgebra::Matrix4::look_at_rh(&self.eye, &self.target, &self.up);
+        let view = Matrix4::look_at_rh(&self.eye, &self.target, &self.up);
         // 2.
         let projection = nalgebra::Perspective3::new(self.aspect, self.fovy, self.znear, self.zfar);
 
         // 3.
         // Convert Perspective3 to Matrix4
         GLTF_TO_VULKAN_MATRIX * projection.as_matrix() * view
+    }
+
+    pub fn build_projection_matrix(&self) -> Matrix4<f32> {
+
+        let projection = nalgebra::Perspective3::new(self.aspect, self.fovy, self.znear, self.zfar);
+
+
+        GLTF_TO_VULKAN_MATRIX * projection.as_matrix()
+    }
+
+    pub fn build_view_matrix(&self) -> Matrix4<f32> {
+ 
+         Matrix4::look_at_rh(&self.eye, &self.target, &self.up)
+
     }
 
     pub fn update_aspect(&mut self, width: u32, height: u32) {
@@ -96,7 +113,7 @@ pub struct CameraUniform {
 impl CameraUniform {
     pub fn new() -> Self {
         Self {
-            view_projection: nalgebra::Matrix4::identity().into(),
+            view_projection: Matrix4::identity().into(),
         }
     }
 
@@ -104,9 +121,6 @@ impl CameraUniform {
         self.view_projection = camera.build_view_projection_matrix().into();
     }
 
-    pub fn set_camera_uniform_buffers(self) {
-        todo!()
-    }
 }
 
 pub struct CameraController {
@@ -193,5 +207,36 @@ impl CameraController {
         if self.is_left_pressed {
             camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
         }
+    }
+}
+
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Pod, Zeroable)]
+pub struct MVP {
+    model: [[f32; 4]; 4],
+    view: [[f32; 4]; 4],
+    projection: [[f32; 4]; 4],
+}
+
+impl MVP {
+    pub fn new() -> MVP {
+        MVP {
+            model: Matrix4::identity().into(),
+            view: Matrix4::identity().into(),
+            projection: Matrix4::identity().into(),
+        }
+    }
+
+    pub fn update_view(&mut self, camera: &Camera) {
+        self.view = camera.build_view_matrix().into();
+    }
+
+    pub fn update_projection(&mut self, camera: &Camera){
+        self.projection = camera.build_projection_matrix().into();
+    }
+
+    pub fn update_model_translate(&mut self , vector: nalgebra::Vector3<f32>) {
+        self.model = nalgebra::Matrix4::new_translation(&vector).into();
     }
 }

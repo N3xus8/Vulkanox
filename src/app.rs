@@ -14,7 +14,7 @@ use winit::{
 };
 
 use crate::{
-    camera::{Camera, CameraController, CameraUniform},
+    camera::{Camera, CameraController, CameraUniform, MVP},
     error::{self, Result},
     vulkan_context::VulkanContext,
     vulkan_device::VulkanDevice,
@@ -50,14 +50,17 @@ impl VisualSystem {
 
         let camera_controller = Arc::new(Mutex::new(CameraController::new(0.2)));
 
-        let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update_view_proj(&camera.lock().unwrap());
+        let mut mvp_uniform = MVP::new();
+        mvp_uniform.update_view(&camera.lock().unwrap());
+        mvp_uniform.update_projection(&camera.lock().unwrap());
+
+        mvp_uniform.update_model_translate(nalgebra::Vector3::new(0.0, 0.0, -1.0));
 
         let samples = SampleCount::Sample4;
 
         let vulkan_context = Arc::new(RefCell::new(VulkanContext::new(
             camera,
-            Arc::new(Mutex::new(camera_uniform)),
+            Arc::new(Mutex::new(mvp_uniform)),
             camera_controller,
             samples,
         )?));
@@ -157,10 +160,10 @@ impl VisualSystem {
         self.vulkan_device
             .vulkan_context
             .borrow()
-            .camera_uniform
+            .mvp_uniform
             .lock()
             .expect("failed to get a lock on camera uniform")
-            .update_view_proj(
+            .update_projection(
                 &self
                     .vulkan_device
                     .vulkan_context
@@ -196,10 +199,10 @@ impl VisualSystem {
         self.vulkan_device
             .vulkan_context
             .borrow()
-            .camera_uniform
+            .mvp_uniform
             .lock()
             .expect("failed to get a lock on camera uniform")
-            .update_view_proj(
+            .update_view(
                 &self
                     .vulkan_device
                     .vulkan_context

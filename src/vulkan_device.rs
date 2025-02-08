@@ -35,7 +35,7 @@ use vulkano::{
 };
 
 use crate::{
-    camera::CameraUniform,
+    camera::{CameraUniform, MVP},
     error::Result,
     index_buffer::setup_index_buffers,
     lighting::{AmbientLight, DirectionalLight, WHITE_AMBIENT_LIGHT},
@@ -54,8 +54,8 @@ pub struct VulkanDevice {
     pub index_buffer: Option<Subbuffer<[u32]>>,
     pub descriptor_set: Arc<PersistentDescriptorSet>,
     pub vulkan_context: Arc<RefCell<VulkanContext>>,
-    pub uniform_staging_buffer: Subbuffer<CameraUniform>,
-    pub uniform_buffer: Subbuffer<CameraUniform>,
+    pub uniform_staging_buffer: Subbuffer<MVP>,
+    pub uniform_buffer: Subbuffer<MVP>,
 }
 
 impl VulkanDevice {
@@ -180,9 +180,9 @@ impl VulkanDevice {
         // Camera
         // ----->
 
-        // Camera setup
+        let mvp_uniform = vulkan_context.borrow().mvp_uniform().clone();
 
-        let camera_uniform = vulkan_context.borrow().camera_uniform().clone();
+        // Camera setup
 
         let uniform_staging_buffer_allocator = SubbufferAllocator::new(
             memory_allocator.clone(),
@@ -204,13 +204,19 @@ impl VulkanDevice {
             },
         );
 
-        let uniform_staging_buffer: Subbuffer<CameraUniform> =
+        // let uniform_staging_buffer: Subbuffer<CameraUniform> =
+        //     uniform_staging_buffer_allocator.allocate_sized()?;
+        // *uniform_staging_buffer.write()? = *camera_uniform.lock().unwrap();
+
+        // let uniform_buffer: Subbuffer<CameraUniform> =
+        //     uniform_buffer_allocator.allocate_sized().unwrap();
+
+            let uniform_staging_buffer: Subbuffer<MVP> =
             uniform_staging_buffer_allocator.allocate_sized()?;
-        *uniform_staging_buffer.write()? = *camera_uniform.lock().unwrap();
+        *uniform_staging_buffer.write()? = *mvp_uniform.lock().unwrap();
 
-        let uniform_buffer: Subbuffer<CameraUniform> =
+        let uniform_buffer: Subbuffer<MVP> =
             uniform_buffer_allocator.allocate_sized().unwrap();
-
         // ---->
         // Staging buffers to Device buffers
         // <-----
@@ -480,7 +486,7 @@ impl VulkanDevice {
         *self.uniform_staging_buffer.write()? = *self
             .vulkan_context
             .borrow()
-            .camera_uniform()
+            .mvp_uniform()
             .lock()
             .unwrap();
 
