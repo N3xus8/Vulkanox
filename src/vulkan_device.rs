@@ -1,27 +1,23 @@
 // Note: Logical Device
 
-use std::{cell::RefCell, sync::{Arc, Mutex}};
+use std::{
+    cell::RefCell,
+    sync::{Arc, Mutex},
+};
 
 use vulkano::{
     buffer::{
         allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
         Buffer, BufferCreateInfo, BufferUsage, Subbuffer,
-    },
-    command_buffer::{
+    }, command_buffer::{
         allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
         CopyBufferInfo,
-    },
-    descriptor_set::{
-        allocator::{StandardDescriptorSetAllocator, StandardDescriptorSetAllocatorCreateInfo},
-        PersistentDescriptorSet, WriteDescriptorSet,
-    },
-    device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo},
-    format::Format,
-    memory::{
+    }, descriptor_set::{
+        allocator::{StandardDescriptorSetAllocator, StandardDescriptorSetAllocatorCreateInfo}, layout::{DescriptorBindingFlags, DescriptorSetLayoutBinding, DescriptorType}, PersistentDescriptorSet, WriteDescriptorSet
+    }, device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo}, format::Format, memory::{
         allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
         MemoryPropertyFlags,
-    },
-    pipeline::{
+    }, pipeline::{
         graphics::{
             color_blend::{ColorBlendAttachmentState, ColorBlendState},
             depth_stencil::{DepthState, DepthStencilState},
@@ -35,15 +31,14 @@ use vulkano::{
         },
         layout::PipelineDescriptorSetLayoutCreateInfo,
         DynamicState, GraphicsPipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
-    },
-    sync::{self, GpuFuture},
-    DeviceSize,
+    }, shader::ShaderStages, sync::{self, GpuFuture}, DeviceSize, NonExhaustive
 };
 
 use crate::{
     camera::CameraUniform,
     error::Result,
     index_buffer::setup_index_buffers,
+    lighting::{AmbientLight, DirectionalLight, WHITE_AMBIENT_LIGHT},
     mesh::MeshBuilder,
     shader::{self, fs, vs},
     vulkan_context::VulkanContext,
@@ -151,7 +146,8 @@ impl VulkanDevice {
                 ..Default::default()
             },
             AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_HOST,
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                 ..Default::default()
             },
             vertices,
@@ -186,15 +182,14 @@ impl VulkanDevice {
 
         // Camera setup
 
-        let camera_uniform = vulkan_context.borrow()
-            .camera_uniform()
-            .clone();
+        let camera_uniform = vulkan_context.borrow().camera_uniform().clone();
 
         let uniform_staging_buffer_allocator = SubbufferAllocator::new(
             memory_allocator.clone(),
             SubbufferAllocatorCreateInfo {
                 buffer_usage: BufferUsage::TRANSFER_SRC,
-                memory_type_filter: MemoryTypeFilter::PREFER_HOST,
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                 ..Default::default()
             },
         );
@@ -267,6 +262,30 @@ impl VulkanDevice {
 
         //
 
+        //  Lights
+
+        // Ambient Light
+
+        let ambient_light = WHITE_AMBIENT_LIGHT;
+
+
+        let ambient_light_subbuffer =
+            AmbientLight::setup_ambient_light_buffers(ambient_light, memory_allocator.clone())?;
+
+        // Directional Light
+
+        let directional_light = DirectionalLight {
+            position: [-4.0, -4.0, 0.0],
+            color: [0.7, 0.63, 0.77],
+        };
+
+        let directional_lights = vec![directional_light.clone()];
+
+        let directional_lights_subbuffer = DirectionalLight::setup_directional_light_buffers(
+            directional_lights,
+            memory_allocator.clone(),
+        )?;
+
         // ---->
         // Graphics Pipeline - Shader
         // ---->
@@ -296,15 +315,43 @@ impl VulkanDevice {
             // shaders; they can be used by shaders in other pipelines that share the same layout.
             // Thus, it is a good idea to design shaders so that many pipelines have common resource
             // locations, which allows them to share pipeline layouts.
-            let layout = PipelineLayout::new(
-                Arc::clone(&device),
-                // Since we only have one pipeline in this example, and thus one pipeline layout,
-                // we automatically generate the creation info for it from the resources used in the
-                // shaders. In a real application, you would specify this information manually so that you
-                // can re-use one layout in multiple pipelines.
-                PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages)
+            // let layout = PipelineLayout::new(
+            //     Arc::clone(&device),
+            //     // Since we only have one pipeline in this example, and thus one pipeline layout,
+            //     // we automatically generate the creation info for it from the resources used in the
+            //     // shaders. In a real application, you would specify this information manually so that you
+            //     // can re-use one layout in multiple pipelines.
+            //     PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages)
+            //         .into_pipeline_layout_create_info(Arc::clone(&device))?,
+            // )?;
+
+            let layout ={
+
+                let mut layout_create_info = PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
+
+                let set_layout = &mut layout_create_info.set_layouts[0];
+                set_layout.bindings.insert(1, DescriptorSetLayoutBinding{
+                    descriptor_type: DescriptorType::UniformBuffer,
+                    descriptor_count: 1,
+                    stages: ShaderStages::FRAGMENT,
+                    ..DescriptorSetLayoutBinding::descriptor_type(DescriptorType::UniformBuffer)
+                });
+
+                set_layout.bindings.insert(2, DescriptorSetLayoutBinding{
+                    descriptor_type: DescriptorType::UniformBuffer,
+                    descriptor_count: 1,
+                    stages: ShaderStages::FRAGMENT,
+                    ..DescriptorSetLayoutBinding::descriptor_type(DescriptorType::UniformBuffer)
+                });
+
+
+                PipelineLayout::new(
+                    Arc::clone(&device),
+                    layout_create_info
                     .into_pipeline_layout_create_info(Arc::clone(&device))?,
-            )?;
+                )?
+
+            };
 
             // We describe the formats of attachment images where the colors, depth and/or stencil
             // information will be written. The pipeline will only be usable with this particular
@@ -348,8 +395,7 @@ impl VulkanDevice {
                     //Original without MSAA 👉 multisample_state: Some(MultisampleState::default()),
                     multisample_state: Some(MultisampleState {
                         // MSAA
-                        rasterization_samples: vulkan_context.borrow()
-                            .samples, //SampleCount::Sample4,
+                        rasterization_samples: vulkan_context.borrow().samples, //SampleCount::Sample4,
                         ..Default::default()
                     }),
                     // How pixel values are combined with the values already present in the framebuffer.
@@ -377,7 +423,11 @@ impl VulkanDevice {
                     .first()
                     .expect("error getting the layout"),
             ),
-            [WriteDescriptorSet::buffer(0, uniform_buffer.clone())],
+            [
+                WriteDescriptorSet::buffer(0, uniform_buffer.clone()),
+                WriteDescriptorSet::buffer(1, ambient_light_subbuffer.clone()),
+                WriteDescriptorSet::buffer(2, directional_lights_subbuffer.clone()),
+            ],
             [],
         )?;
 
@@ -428,7 +478,8 @@ impl VulkanDevice {
 
     pub fn update_uniform_buffer(&self) -> Result<()> {
         *self.uniform_staging_buffer.write()? = *self
-            .vulkan_context.borrow()
+            .vulkan_context
+            .borrow()
             .camera_uniform()
             .lock()
             .unwrap();

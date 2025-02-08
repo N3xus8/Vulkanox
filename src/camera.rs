@@ -103,6 +103,10 @@ impl CameraUniform {
     pub fn update_view_proj(&mut self, camera: &Camera) {
         self.view_projection = camera.build_view_projection_matrix().into();
     }
+
+    pub fn set_camera_uniform_buffers(self) {
+        todo!()
+    }
 }
 
 pub struct CameraController {

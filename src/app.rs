@@ -1,5 +1,7 @@
 use std::{
-    cell::RefCell, collections::BTreeMap, sync::{Arc, Mutex}
+    cell::RefCell,
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
 };
 
 use tracing::info;
@@ -145,22 +147,24 @@ impl VisualSystem {
 
         // update camera aspect ratio
         self.vulkan_device
-            .vulkan_context.borrow()
+            .vulkan_context
+            .borrow()
             .camera
             .lock()
             .expect("failed to get a lock on camera ")
             .update_aspect(new_size.width, new_size.height);
 
-
         self.vulkan_device
-            .vulkan_context.borrow()
+            .vulkan_context
+            .borrow()
             .camera_uniform
             .lock()
             .expect("failed to get a lock on camera uniform")
             .update_view_proj(
                 &self
                     .vulkan_device
-                    .vulkan_context.borrow()
+                    .vulkan_context
+                    .borrow()
                     .camera
                     .lock()
                     .unwrap(),
@@ -172,38 +176,40 @@ impl VisualSystem {
     }
 
     pub fn input(&mut self) -> Result<()> {
+        // update camera via camera controller
+        self.vulkan_device
+            .vulkan_context
+            .borrow()
+            .camera_controller
+            .lock()
+            .expect("failed to get a lock on camera controller")
+            .update_camera(
+                &mut self
+                    .vulkan_device
+                    .vulkan_context
+                    .borrow()
+                    .camera
+                    .lock()
+                    .expect("failed to get a lock on camera"),
+            );
 
-                // update camera via camera controller
-                self.vulkan_device
-                .vulkan_context.borrow()
-                .camera_controller
-                .lock()
-                .expect("failed to get a lock on camera controller")
-                .update_camera(
-                    &mut self
-                        .vulkan_device
-                        .vulkan_context.borrow()
-                        .camera
-                        .lock()
-                        .expect("failed to get a lock on camera"),
-                );
+        self.vulkan_device
+            .vulkan_context
+            .borrow()
+            .camera_uniform
+            .lock()
+            .expect("failed to get a lock on camera uniform")
+            .update_view_proj(
+                &self
+                    .vulkan_device
+                    .vulkan_context
+                    .borrow()
+                    .camera
+                    .lock()
+                    .unwrap(),
+            );
 
-        
-                self.vulkan_device
-                .vulkan_context.borrow()
-                .camera_uniform
-                .lock()
-                .expect("failed to get a lock on camera uniform")
-                .update_view_proj(
-                    &self
-                        .vulkan_device
-                        .vulkan_context.borrow()
-                        .camera
-                        .lock()
-                        .unwrap(),
-                );
-    
-            self.vulkan_device.update_uniform_buffer()?;
+        self.vulkan_device.update_uniform_buffer()?;
 
         Ok(())
     }
@@ -299,14 +305,14 @@ impl App {
 
                         _ => {}
                     }
-                } else { 
-                    self
-                    .visual_system
-                    .as_mut()
-                    .unwrap()
-                    .input()
-                    .map_err(|_| error::VisualSystemError::ErrorInputVisualSystem)?}
-            } 
+                } else {
+                    self.visual_system
+                        .as_mut()
+                        .unwrap()
+                        .input()
+                        .map_err(|_| error::VisualSystemError::ErrorInputVisualSystem)?
+                }
+            }
 
             Event::Resumed => {
                 if self.is_app_started {

@@ -1,4 +1,7 @@
+use std::iter::zip;
+
 use gltf::Gltf;
+use tracing::warn;
 
 use crate::error::Result;
 use crate::shader::Vertex;
@@ -106,10 +109,25 @@ impl MeshBuilder {
 
     pub fn vertices(&self) -> Result<Vec<Vertex>> {
         let mut vertices = Vec::<Vertex>::new();
-        for position in &self.positions {
-            vertices.push(Vertex {
-                position: *position,
-            });
+
+        match &self.normals {
+            Some(normals) => {
+                for (position, normal) in self.positions.iter().zip(normals.iter()) {
+                    vertices.push(Vertex {
+                        position: *position,
+                        normal: *normal,
+                    });
+                }
+            }
+            None => {
+                for position in &self.positions {
+                    warn!("no normal found. compute default");
+                    vertices.push(Vertex {
+                        position: *position,
+                        normal: [0., 0., 1.],
+                    });
+                }
+            }
         }
 
         Ok(vertices)

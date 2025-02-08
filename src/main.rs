@@ -7,6 +7,7 @@ use winit::event_loop::EventLoopBuilder;
 mod app;
 mod camera;
 mod index_buffer;
+mod lighting;
 mod mesh;
 mod shader;
 mod vulkan_context;

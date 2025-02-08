@@ -21,9 +21,10 @@ pub mod vs {
                 #version 460
 
                 layout(location = 0) in vec3 position;
+                layout(location = 1) in vec3 normal;
 
                 layout(location = 0) out vec3 fragColor;
-
+//                layout(location = 1) out vec3 out_normal;
                // layout(location = 1) in vec3 color;
 
                layout(set = 0, binding = 0) uniform data {
@@ -56,8 +57,21 @@ pub mod fs {
 
                 layout(location = 0) out vec4 outColor;
 
+                layout(set = 0, binding = 1) uniform AmbientLight {
+                    vec3 color;
+                    float intensity;
+                } ambient;
+
+                layout(set = 0, binding = 2) uniform DirectionalLight {
+                    vec3 position;
+                    vec3 color;
+                } directional;
+
                 void main(){
-                    outColor = vec4(fragColor, 1.0);
+                    vec3 ambient_color = ambient.intensity * ambient.color;
+                    vec3 combined_color = ambient_color * fragColor;
+                    outColor = vec4(combined_color, 1.0);
+                    //outColor = vec4(fragColor, 1.0);
                 }
             ",
     }
@@ -68,18 +82,7 @@ pub mod fs {
 pub struct Vertex {
     #[format(R32G32B32_SFLOAT)]
     pub position: [f32; 3],
+    #[format(R32G32B32_SFLOAT)]
+    pub normal: [f32; 3],
 }
 
-pub const VERTICES: [Vertex; 3] = [
-    Vertex {
-        position: [0.0, -0.25, 0.0],
-    },
-    Vertex {
-        position: [-0.5, 0.25, 0.0],
-    },
-    Vertex {
-        position: [0.5, 0.25, 0.0],
-    },
-];
-
-pub const INDICES: [u32; 3] = [0, 1, 1];
