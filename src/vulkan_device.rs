@@ -9,15 +9,23 @@ use vulkano::{
     buffer::{
         allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
         Buffer, BufferCreateInfo, BufferUsage, Subbuffer,
-    }, command_buffer::{
+    },
+    command_buffer::{
         allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
         CopyBufferInfo,
-    }, descriptor_set::{
-        allocator::{StandardDescriptorSetAllocator, StandardDescriptorSetAllocatorCreateInfo}, layout::{DescriptorBindingFlags, DescriptorSetLayoutBinding, DescriptorType}, PersistentDescriptorSet, WriteDescriptorSet
-    }, device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo}, format::Format, memory::{
+    },
+    descriptor_set::{
+        allocator::{StandardDescriptorSetAllocator, StandardDescriptorSetAllocatorCreateInfo},
+        layout::{DescriptorBindingFlags, DescriptorSetLayoutBinding, DescriptorType},
+        PersistentDescriptorSet, WriteDescriptorSet,
+    },
+    device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo},
+    format::Format,
+    memory::{
         allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
         MemoryPropertyFlags,
-    }, pipeline::{
+    },
+    pipeline::{
         graphics::{
             color_blend::{ColorBlendAttachmentState, ColorBlendState},
             depth_stencil::{DepthState, DepthStencilState},
@@ -31,16 +39,20 @@ use vulkano::{
         },
         layout::PipelineDescriptorSetLayoutCreateInfo,
         DynamicState, GraphicsPipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
-    }, shader::ShaderStages, sync::{self, GpuFuture}, DeviceSize, NonExhaustive
+    },
+    shader::ShaderStages,
+    sync::{self, GpuFuture},
+    DeviceSize, NonExhaustive,
 };
 
 use crate::{
     camera::{CameraUniform, MVP},
     error::Result,
     index_buffer::setup_index_buffers,
+    instance_buffer::{self, Instance, InstanceRaw},
     lighting::{AmbientLight, DirectionalLight, WHITE_AMBIENT_LIGHT},
     mesh::MeshBuilder,
-    shader::{self, fs, vs},
+    shader::{self, fs, vs, Vertex},
     vulkan_context::VulkanContext,
     vulkan_instance::VulkanInstance,
 };
@@ -51,6 +63,7 @@ pub struct VulkanDevice {
     command_allocator: Arc<StandardCommandBufferAllocator>,
     graphics_pipeline: Arc<GraphicsPipeline>,
     pub vertex_buffer: Subbuffer<[shader::Vertex]>,
+    pub instance_buffer: Subbuffer<[InstanceRaw]>,
     pub index_buffer: Option<Subbuffer<[u32]>>,
     pub descriptor_set: Arc<PersistentDescriptorSet>,
     pub vulkan_context: Arc<RefCell<VulkanContext>>,
@@ -136,22 +149,6 @@ impl VulkanDevice {
 
         // let indices: Vec<u32> = indices.iter().map(|id| *id as u32).collect();
 
-        // <---  -S T A G I N G  B U F F E R S-
-        // Create a Staging Vertex buffer  : subbuffer<[Vertex]>
-
-        let vertex_staging_buffer = Buffer::from_iter(
-            memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_HOST
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            vertices,
-        )?;
 
         // Create a Vertex buffer  : subbuffer<[Vertex]>
 
@@ -175,6 +172,74 @@ impl VulkanDevice {
         // Option for index staging buffer and index buffer
         let (index_staging_buffer, index_buffer) =
             setup_index_buffers(indices, memory_allocator.clone())?;
+
+        // Instances for vertex model
+        // Create a Vertex buffer  : subbuffer<[InstanceRaw]>
+
+        let instances = Instance::new()
+            .iter()
+            .map(Instance::to_raw)
+            .collect::<Vec<_>>();
+
+        let instances_length = instances.len();
+
+        println!("INSTANCES NUMBER: {:}", instances_length);
+
+        let instance_buffer = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DST,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter {
+                    required_flags: MemoryPropertyFlags::DEVICE_LOCAL, // Make sure this buffer is on the Device=GPU
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            instances_length as DeviceSize,
+        )?;
+
+        // <---  -S T A G I N G  B U F F E R S-
+
+        // Create a Staging Vertex buffer  : subbuffer<[Vertex]>
+
+        // let vertex_staging_buffer = Buffer::from_iter(
+        //     memory_allocator.clone(),
+        //     BufferCreateInfo {
+        //         usage: BufferUsage::TRANSFER_SRC,
+        //         ..Default::default()
+        //     },
+        //     AllocationCreateInfo {
+        //         memory_type_filter: MemoryTypeFilter::PREFER_HOST
+        //             | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+        //         ..Default::default()
+        //     },
+        //     vertices,
+        // )?;
+
+        let subbuffer_allocator = SubbufferAllocator::new(
+            memory_allocator.clone(),
+            SubbufferAllocatorCreateInfo {
+                arena_size: vertex_buffer.size() + instance_buffer.size(),
+                buffer_usage: BufferUsage::TRANSFER_SRC,
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+        );
+
+        let vertex_staging_buffer = subbuffer_allocator.allocate_slice::<Vertex>(vertices_length as DeviceSize)?;
+        let instances_staging_buffer = subbuffer_allocator.allocate_slice::<InstanceRaw>(instances_length as DeviceSize)?;
+        
+
+        {
+            let mut vertex_writer = vertex_staging_buffer.write()?;
+            vertex_writer.copy_from_slice(&vertices);
+            let mut instance_writer = instances_staging_buffer.write()?;
+            instance_writer.copy_from_slice(&instances);
+
+        }
 
         // <----
         // Camera
@@ -211,12 +276,11 @@ impl VulkanDevice {
         // let uniform_buffer: Subbuffer<CameraUniform> =
         //     uniform_buffer_allocator.allocate_sized().unwrap();
 
-            let uniform_staging_buffer: Subbuffer<MVP> =
+        let uniform_staging_buffer: Subbuffer<MVP> =
             uniform_staging_buffer_allocator.allocate_sized()?;
         *uniform_staging_buffer.write()? = *mvp_uniform.lock().unwrap();
 
-        let uniform_buffer: Subbuffer<MVP> =
-            uniform_buffer_allocator.allocate_sized().unwrap();
+        let uniform_buffer: Subbuffer<MVP> = uniform_buffer_allocator.allocate_sized().unwrap();
         // ---->
         // Staging buffers to Device buffers
         // <-----
@@ -233,6 +297,11 @@ impl VulkanDevice {
         command_builder.copy_buffer(CopyBufferInfo::buffers(
             vertex_staging_buffer,
             vertex_buffer.clone(),
+        ))?;
+
+        command_builder.copy_buffer(CopyBufferInfo::buffers(
+        instances_staging_buffer,
+        instance_buffer.clone(),
         ))?;
 
         // Condition on index buffer existence
@@ -282,7 +351,7 @@ impl VulkanDevice {
 
         let directional_light = DirectionalLight {
             position: [0.0, 0.2, 1.5],
-            color: [ 1.0, 1.0, 0.0],
+            color: [1.0, 1.0, 0.0],
         };
 
         //let directional_light = vec![directional_light.clone()];
@@ -305,7 +374,7 @@ impl VulkanDevice {
             // Automatically generate a vertex input state from the vertex shader's input interface,
             // that takes a single vertex buffer containing `Vertex` structs.
             let vertex_input_state =
-                shader::Vertex::per_vertex().definition(&vertex_shader.info().input_interface)?;
+                [shader::Vertex::per_vertex(), instance_buffer::InstanceRaw::per_instance()].definition(&vertex_shader.info().input_interface)?;
 
             let stages: [PipelineShaderStageCreateInfo; 2] = [
                 PipelineShaderStageCreateInfo::new(vertex_shader),
@@ -331,32 +400,35 @@ impl VulkanDevice {
             //         .into_pipeline_layout_create_info(Arc::clone(&device))?,
             // )?;
 
-            let layout ={
-
-                let mut layout_create_info = PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
+            let layout = {
+                let mut layout_create_info =
+                    PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
 
                 let set_layout = &mut layout_create_info.set_layouts[0];
-                set_layout.bindings.insert(1, DescriptorSetLayoutBinding{
-                    descriptor_type: DescriptorType::UniformBuffer,
-                    descriptor_count: 1,
-                    stages: ShaderStages::FRAGMENT,
-                    ..DescriptorSetLayoutBinding::descriptor_type(DescriptorType::UniformBuffer)
-                });
+                set_layout.bindings.insert(
+                    1,
+                    DescriptorSetLayoutBinding {
+                        descriptor_type: DescriptorType::UniformBuffer,
+                        descriptor_count: 1,
+                        stages: ShaderStages::FRAGMENT,
+                        ..DescriptorSetLayoutBinding::descriptor_type(DescriptorType::UniformBuffer)
+                    },
+                );
 
-                set_layout.bindings.insert(2, DescriptorSetLayoutBinding{
-                    descriptor_type: DescriptorType::UniformBuffer,
-                    descriptor_count: 1,
-                    stages: ShaderStages::FRAGMENT,
-                    ..DescriptorSetLayoutBinding::descriptor_type(DescriptorType::UniformBuffer)
-                });
-
+                set_layout.bindings.insert(
+                    2,
+                    DescriptorSetLayoutBinding {
+                        descriptor_type: DescriptorType::UniformBuffer,
+                        descriptor_count: 1,
+                        stages: ShaderStages::FRAGMENT,
+                        ..DescriptorSetLayoutBinding::descriptor_type(DescriptorType::UniformBuffer)
+                    },
+                );
 
                 PipelineLayout::new(
                     Arc::clone(&device),
-                    layout_create_info
-                    .into_pipeline_layout_create_info(Arc::clone(&device))?,
+                    layout_create_info.into_pipeline_layout_create_info(Arc::clone(&device))?,
                 )?
-
             };
 
             // We describe the formats of attachment images where the colors, depth and/or stencil
@@ -447,6 +519,7 @@ impl VulkanDevice {
             graphics_pipeline,
             vertex_buffer,
             index_buffer,
+            instance_buffer,
             descriptor_set,
             vulkan_context,
             uniform_staging_buffer,
@@ -483,12 +556,8 @@ impl VulkanDevice {
     }
 
     pub fn update_uniform_buffer(&self) -> Result<()> {
-        *self.uniform_staging_buffer.write()? = *self
-            .vulkan_context
-            .borrow()
-            .mvp_uniform()
-            .lock()
-            .unwrap();
+        *self.uniform_staging_buffer.write()? =
+            *self.vulkan_context.borrow().mvp_uniform().lock().unwrap();
 
         let mut command_builder = AutoCommandBufferBuilder::primary(
             &self.command_allocator,

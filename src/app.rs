@@ -75,7 +75,7 @@ impl VisualSystem {
 
         let symbol_list = "♔♕♖♗♘♙☚★";
 
-        for idx in 0..0 {
+        for idx in 0..1 {
             let char_at_index = symbol_list
                 .chars()
                 .nth(idx % (symbol_list.chars().count()))

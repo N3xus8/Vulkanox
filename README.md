@@ -8,7 +8,10 @@ _Date: February 2025._
 
 This is **Vulkano** implentation as a tutorial and reference.
 
+https://github.com/vulkano-rs/vulkano/tree/master
+
 Vulkano version 0.34 .
+
 Winit version 0.29.3
 
 <u>Prerequisites:</u>
@@ -23,6 +26,7 @@ You will need a C/C++ compiler for shader compilation.
 + Read GLTF files for models.
 + Index buffer.
 + Vertex buffer.
++ Depth buffer.
 + MVP (Model-View-Projection).
 + MSAA.
 + Staging buffers.

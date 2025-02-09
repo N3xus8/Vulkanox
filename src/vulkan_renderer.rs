@@ -290,7 +290,6 @@ impl VulkanRenderer {
         // ----->
         // Command buffer builder
         // <-----
-        //println!("DEBUG INDEX BUFFER: {:} ", self.vulkan_device.index_buffer().len());
 
         // Before we can draw, we have to *enter a render pass*. We specify which
         // attachments we are going to use for rendering here, which needs to match
@@ -341,7 +340,13 @@ impl VulkanRenderer {
             // TODO: Document state setting and how it affects subsequent draw commands.
             .set_viewport(0, [viewport.clone()].into_iter().collect())?
             .bind_pipeline_graphics(Arc::clone(self.vulkan_device.graphics_pipeline()))?
-            .bind_vertex_buffers(0, self.vulkan_device.vertex_buffer.clone())?
+            .bind_vertex_buffers(
+                0,
+                (
+                    self.vulkan_device.vertex_buffer.clone(),
+                    self.vulkan_device.instance_buffer.clone(),
+                ),
+            )?
             .bind_descriptor_sets(
                 PipelineBindPoint::Graphics,
                 Arc::clone(self.vulkan_device.graphics_pipeline().layout()),
@@ -358,7 +363,13 @@ impl VulkanRenderer {
         match self.vulkan_device.index_buffer() {
             Some(index_buffer) => builder
                 .bind_index_buffer(index_buffer.clone())?
-                .draw_indexed(index_buffer.len() as u32, 1, 0, 0, 0)?,
+                .draw_indexed(
+                    index_buffer.len() as u32,
+                    self.vulkan_device.instance_buffer.len() as u32,
+                    0,
+                    0,
+                    0,
+                )?,
             None => builder.draw(self.vulkan_device.vertex_buffer.len() as u32, 1, 0, 0)?,
         }
         // We leave the render pass.

@@ -2,11 +2,11 @@ use std::f32::consts::FRAC_PI_4;
 
 use bytemuck::{Pod, Zeroable};
 
+use nalgebra::Matrix4;
 use winit::{
     event::{ElementState, KeyEvent, WindowEvent},
     keyboard::{KeyCode, PhysicalKey},
 };
-use nalgebra::Matrix4;
 
 #[rustfmt::skip]
 #[allow(unused)]
@@ -72,17 +72,13 @@ impl Camera {
     }
 
     pub fn build_projection_matrix(&self) -> Matrix4<f32> {
-
         let projection = nalgebra::Perspective3::new(self.aspect, self.fovy, self.znear, self.zfar);
-
 
         GLTF_TO_VULKAN_MATRIX * projection.as_matrix()
     }
 
     pub fn build_view_matrix(&self) -> Matrix4<f32> {
- 
-         Matrix4::look_at_rh(&self.eye, &self.target, &self.up)
-
+        Matrix4::look_at_rh(&self.eye, &self.target, &self.up)
     }
 
     pub fn update_aspect(&mut self, width: u32, height: u32) {
@@ -120,7 +116,6 @@ impl CameraUniform {
     pub fn update_view_proj(&mut self, camera: &Camera) {
         self.view_projection = camera.build_view_projection_matrix().into();
     }
-
 }
 
 pub struct CameraController {
@@ -232,11 +227,11 @@ impl MVP {
         self.view = camera.build_view_matrix().into();
     }
 
-    pub fn update_projection(&mut self, camera: &Camera){
+    pub fn update_projection(&mut self, camera: &Camera) {
         self.projection = camera.build_projection_matrix().into();
     }
 
-    pub fn update_model_translate(&mut self , vector: nalgebra::Vector3<f32>) {
+    pub fn update_model_translate(&mut self, vector: nalgebra::Vector3<f32>) {
         self.model = nalgebra::Matrix4::new_translation(&vector).into();
     }
 }

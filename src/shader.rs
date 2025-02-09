@@ -23,28 +23,50 @@ pub mod vs {
                 layout(location = 0) in vec3 position;
                 layout(location = 1) in vec3 normal;
 
+                 layout(location = 2) in vec4 matrix1;
+                 layout(location = 3) in vec4 matrix2;
+                 layout(location = 4) in vec4 matrix3;
+                 layout(location = 5) in vec4 matrix4;
+
+
                 layout(location = 0) out vec3 fragColor;
                 layout(location = 1) out vec3 out_normal;
                 layout(location = 2) out vec3 frag_pos;
-
+            
+               // MVP 
                layout(set = 0, binding = 0) uniform MVP {
                     mat4 model;
                     mat4 view;
                     mat4 projection;
                } uniforms;
 
-
+                // Use push constant for time. Time is available but no used.
                 layout(push_constant) uniform PushConstantData {
                     float time;
                 } pc;
 
+                // Matrix for the instances
+                mat4 model_matrix = mat4(
+                        matrix1,
+                        matrix2,
+                        matrix3,
+                        matrix4
+                );
 
                 void main() {
                    // Original gl_Position = vec4(position*sin(pc.time), 1.0);
-                   mat4 worldview = uniforms.view * uniforms.model;
+
+                   // world view . Note: model aka local view
+                   mat4 worldview = uniforms.view * model_matrix * uniforms.model;
+                   
+                   // Final coord with projection
                    gl_Position = uniforms.projection * worldview  * vec4(position, 1.0);
                     //gl_Position =  vec4(position, 1.0);
+
+                    // Rainbow effect
                     fragColor = position ;
+
+                    // Normal for the model
                     out_normal = mat3(uniforms.model) * normal;
                     frag_pos = vec3(uniforms.model * vec4(position, 1.0));            
                 }
@@ -75,10 +97,15 @@ pub mod fs {
                 } directional;
 
                 void main(){
+                    // Ambient Light
                     vec3 ambient_color = ambient.intensity * ambient.color;
+
+                    //  Directional Light
                     vec3 light_direction = normalize(directional.position - frag_pos);
                     float directional_intensity = max(dot(in_normal, light_direction), 0.0);
                     vec3 directional_color = directional_intensity * directional.color;
+
+                    // Combined Ambient Light and directional Light
                     vec3 combined_color = (ambient_color + directional_color)  * fragColor;
                     outColor = vec4(combined_color, 1.0);
                     //outColor = vec4(fragColor, 1.0);
@@ -87,7 +114,7 @@ pub mod fs {
     }
 }
 
-#[derive(Debug, BufferContents, VertexInput)]
+#[derive(Debug, BufferContents, Copy, Clone, VertexInput)]
 #[repr(C)]
 pub struct Vertex {
     #[format(R32G32B32_SFLOAT)]
@@ -95,4 +122,3 @@ pub struct Vertex {
     #[format(R32G32B32_SFLOAT)]
     pub normal: [f32; 3],
 }
-
