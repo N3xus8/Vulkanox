@@ -14,3 +14,4 @@ palette = {version = "0.7.6"}
 gltf = "1.4.1"
 nalgebra = "0.33.2"
 bytemuck = "1.21.0"
+image = "0.25.0"

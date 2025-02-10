@@ -3,13 +3,9 @@ use std::sync::Arc;
 use bytemuck::{Pod, Zeroable};
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
-    memory::{
-        allocator::{
+    memory::allocator::{
             AllocationCreateInfo, FreeListAllocator, GenericMemoryAllocator, MemoryTypeFilter,
         },
-        MemoryPropertyFlags,
-    },
-    DeviceSize,
 };
 
 use crate::error::Result;

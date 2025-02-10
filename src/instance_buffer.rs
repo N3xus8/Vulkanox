@@ -3,13 +3,13 @@ use std::f32::consts::FRAC_PI_2;
 use nalgebra::{Matrix4, Unit, UnitQuaternion, Vector3};
 use vulkano::{buffer::BufferContents, pipeline::graphics::vertex_input::Vertex};
 
-const NUM_INSTANCES_PER_ROW: u32 = 3;
+const NUM_INSTANCES_PER_ROW: u32 = 4;
 const INSTANCE_DISPLACEMENT: Vector3<f32> = Vector3::new(
     NUM_INSTANCES_PER_ROW as f32 * 0.5,
     NUM_INSTANCES_PER_ROW as f32 * 0.5,
     0.0,
 );
-const SPACE_BETWEEN: f32 = 3.0;
+const SPACE_BETWEEN: f32 = 2.0;
 pub struct Instance {
     position: Vector3<f32>,
     rotation: UnitQuaternion<f32>,

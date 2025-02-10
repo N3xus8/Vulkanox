@@ -107,6 +107,8 @@ pub mod fs {
 
                     // Combined Ambient Light and directional Light
                     vec3 combined_color = (ambient_color + directional_color)  * fragColor;
+
+                    // Final color output
                     outColor = vec4(combined_color, 1.0);
                     //outColor = vec4(fragColor, 1.0);
                 }

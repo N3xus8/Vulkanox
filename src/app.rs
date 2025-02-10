@@ -20,6 +20,7 @@ use crate::{
     vulkan_device::VulkanDevice,
     vulkan_instance::VulkanInstance,
     vulkan_renderer::VulkanRenderer,
+    utils::load_icon,
 };
 
 pub struct VisualSystem {
@@ -32,10 +33,14 @@ pub struct VisualSystem {
 
 impl VisualSystem {
     pub fn new<T>(window_target: &EventLoopWindowTarget<T>) -> Result<Self> {
+
+        let window_icon: Option<winit::window::Icon> = Some(load_icon("./assets/icon.png"));
+
         // Support Multi windows
         let primary_window = Arc::new(
             WindowBuilder::new()
                 .with_title("🌋VULKANO ♣")
+                .with_window_icon(window_icon)
                 .with_visible(false)
                 .build(window_target)?,
         );
@@ -75,7 +80,7 @@ impl VisualSystem {
 
         let symbol_list = "♔♕♖♗♘♙☚★";
 
-        for idx in 0..1 {
+        for idx in 0..0 {
             let char_at_index = symbol_list
                 .chars()
                 .nth(idx % (symbol_list.chars().count()))
@@ -143,37 +148,43 @@ impl VisualSystem {
     }
 
     pub fn resize(&mut self, window_id: WindowId, new_size: PhysicalSize<u32>) -> Result<()> {
-        self.vulkan_renderers[&window_id]
-            .lock()
-            .expect("failed to get a lock on vulkan renderer")
-            .recreate()?; // Use Mutex fo interior mutability
 
-        // update camera aspect ratio
-        self.vulkan_device
-            .vulkan_context
-            .borrow()
-            .camera
-            .lock()
-            .expect("failed to get a lock on camera ")
-            .update_aspect(new_size.width, new_size.height);
+        if !(new_size.width == 0 || new_size.height == 0) {
+            self.vulkan_renderers[&window_id]
+                .lock()
+                .expect("failed to get a lock on vulkan renderer")
+                .recreate()?; // Use Mutex for interior mutability
 
-        self.vulkan_device
-            .vulkan_context
-            .borrow()
-            .mvp_uniform
-            .lock()
-            .expect("failed to get a lock on camera uniform")
-            .update_projection(
-                &self
-                    .vulkan_device
-                    .vulkan_context
-                    .borrow()
-                    .camera
-                    .lock()
-                    .unwrap(),
-            );
+            // update camera aspect ratio
+            self.vulkan_device
+                .vulkan_context
+                .borrow()
+                .camera
+                .lock()
+                .expect("failed to get a lock on camera ")
+                .update_aspect(new_size.width, new_size.height);
 
-        self.vulkan_device.update_uniform_buffer()?;
+            self.vulkan_device
+                .vulkan_context
+                .borrow()
+                .mvp_uniform
+                .lock()
+                .expect("failed to get a lock on camera uniform")
+                .update_projection(
+                    &self
+                        .vulkan_device
+                        .vulkan_context
+                        .borrow()
+                        .camera
+                        .lock()
+                        .unwrap(),
+                );
+
+            self.vulkan_device.update_uniform_buffer()?;
+
+        return Ok(()) ;
+
+        }
 
         Ok(())
     }

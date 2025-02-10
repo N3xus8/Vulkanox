@@ -42,11 +42,11 @@ use vulkano::{
     },
     shader::ShaderStages,
     sync::{self, GpuFuture},
-    DeviceSize, NonExhaustive,
+    DeviceSize,
 };
 
 use crate::{
-    camera::{CameraUniform, MVP},
+    camera::MVP,
     error::Result,
     index_buffer::setup_index_buffers,
     instance_buffer::{self, Instance, InstanceRaw},
@@ -149,7 +149,6 @@ impl VulkanDevice {
 
         // let indices: Vec<u32> = indices.iter().map(|id| *id as u32).collect();
 
-
         // Create a Vertex buffer  : subbuffer<[Vertex]>
 
         let vertex_buffer = Buffer::new_slice(
@@ -224,21 +223,22 @@ impl VulkanDevice {
             SubbufferAllocatorCreateInfo {
                 arena_size: vertex_buffer.size() + instance_buffer.size(),
                 buffer_usage: BufferUsage::TRANSFER_SRC,
-                memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                 ..Default::default()
             },
         );
 
-        let vertex_staging_buffer = subbuffer_allocator.allocate_slice::<Vertex>(vertices_length as DeviceSize)?;
-        let instances_staging_buffer = subbuffer_allocator.allocate_slice::<InstanceRaw>(instances_length as DeviceSize)?;
-        
+        let vertex_staging_buffer =
+            subbuffer_allocator.allocate_slice::<Vertex>(vertices_length as DeviceSize)?;
+        let instances_staging_buffer =
+            subbuffer_allocator.allocate_slice::<InstanceRaw>(instances_length as DeviceSize)?;
 
         {
             let mut vertex_writer = vertex_staging_buffer.write()?;
             vertex_writer.copy_from_slice(&vertices);
             let mut instance_writer = instances_staging_buffer.write()?;
             instance_writer.copy_from_slice(&instances);
-
         }
 
         // <----
@@ -300,8 +300,8 @@ impl VulkanDevice {
         ))?;
 
         command_builder.copy_buffer(CopyBufferInfo::buffers(
-        instances_staging_buffer,
-        instance_buffer.clone(),
+            instances_staging_buffer,
+            instance_buffer.clone(),
         ))?;
 
         // Condition on index buffer existence
@@ -350,8 +350,8 @@ impl VulkanDevice {
         // Directional Light
 
         let directional_light = DirectionalLight {
-            position: [0.0, 0.2, 1.5],
-            color: [1.0, 1.0, 0.0],
+            position: [0., 0.2, 1.5],
+            color: [0.2, 0.7, 0.3],
         };
 
         //let directional_light = vec![directional_light.clone()];
@@ -373,8 +373,11 @@ impl VulkanDevice {
 
             // Automatically generate a vertex input state from the vertex shader's input interface,
             // that takes a single vertex buffer containing `Vertex` structs.
-            let vertex_input_state =
-                [shader::Vertex::per_vertex(), instance_buffer::InstanceRaw::per_instance()].definition(&vertex_shader.info().input_interface)?;
+            let vertex_input_state = [
+                shader::Vertex::per_vertex(),
+                instance_buffer::InstanceRaw::per_instance(),
+            ]
+            .definition(&vertex_shader.info().input_interface)?; // 👈 Don't forget otherwise binding will be missing
 
             let stages: [PipelineShaderStageCreateInfo; 2] = [
                 PipelineShaderStageCreateInfo::new(vertex_shader),
@@ -449,7 +452,7 @@ impl VulkanDevice {
                 GraphicsPipelineCreateInfo {
                     stages: stages.into_iter().collect(),
                     // How vertex data is read from the vertex buffers into the vertex shader.
-                    vertex_input_state: Some(vertex_input_state),
+                    vertex_input_state: Some(vertex_input_state), // 👈 Do not forget
                     // How vertices are arranged into primitive shapes.
                     // The default primitive shape is a triangle.
                     input_assembly_state: Some(InputAssemblyState::default()),

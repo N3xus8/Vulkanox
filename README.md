@@ -20,12 +20,17 @@ Install Vulkan SDK for your platform.
 
 You will need a C/C++ compiler for shader compilation.
 
+<u>Nice to have:</u>
+
+RenderDoc for Vulkan debugging
+
 <u>Features:</u>
 
 + Multi windows.
 + Read GLTF files for models.
 + Index buffer.
 + Vertex buffer.
++ Instances buffer.
 + Depth buffer.
 + MVP (Model-View-Projection).
 + MSAA.
@@ -36,4 +41,4 @@ You will need a C/C++ compiler for shader compilation.
 + Lighting.
 + Push constants.
 
-![alt text](RainbowCube.png "Cube")
+![alt text](RainbowCubes.png "Cube")

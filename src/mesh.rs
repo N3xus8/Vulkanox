@@ -1,7 +1,7 @@
 use std::iter::zip;
 
 use gltf::Gltf;
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::error::Result;
 use crate::shader::Vertex;
@@ -42,8 +42,10 @@ impl MeshBuilder {
 
                 // Positions
                 if let Some(iter) = reader.read_positions() {
+                    
+                    println!("VERTICES NUMBER: {:?}", iter.len());
+
                     for vertex_position in iter {
-                        //   println!("{:?}", vertex_position);
                         positions.push(vertex_position);
                     }
                 }
@@ -53,8 +55,9 @@ impl MeshBuilder {
                     iter,
                 ))) = reader.read_indices()
                 {
+                    println!("INDICES NUMBER: {:?}", iter.len());
+
                     for indice in iter {
-                        //    println!("{:?}", indice);
                         indices.push(indice);
                     }
                 }
@@ -97,7 +100,7 @@ impl MeshBuilder {
         } else {
             Some(normals)
         };
-        let uvs = if uvs.is_empty() { None } else { Some(uvs) };
+        let uvs = if uvs.is_empty() { warn!("no UV found") ; None } else { info!(" found some UV"); Some(uvs) };
 
         Ok(MeshBuilder {
             positions,
