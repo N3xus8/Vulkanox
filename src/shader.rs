@@ -22,17 +22,19 @@ pub mod vs {
 
                 layout(location = 0) in vec3 position;
                 layout(location = 1) in vec3 normal;
+                layout(location = 2) in vec2 uvs;
 
-                 layout(location = 2) in vec4 matrix1;
-                 layout(location = 3) in vec4 matrix2;
-                 layout(location = 4) in vec4 matrix3;
-                 layout(location = 5) in vec4 matrix4;
+                 layout(location = 3) in vec4 matrix1;
+                 layout(location = 4) in vec4 matrix2;
+                 layout(location = 5) in vec4 matrix3;
+                 layout(location = 6) in vec4 matrix4;
 
 
                 layout(location = 0) out vec3 fragColor;
                 layout(location = 1) out vec3 out_normal;
                 layout(location = 2) out vec3 frag_pos;
-            
+                layout(location = 3) out vec2 tex_coords;
+
                // MVP 
                layout(set = 0, binding = 0) uniform MVP {
                     mat4 model;
@@ -68,7 +70,9 @@ pub mod vs {
 
                     // Normal for the model
                     out_normal = mat3(uniforms.model) * normal;
-                    frag_pos = vec3(uniforms.model * vec4(position, 1.0));            
+                    frag_pos = vec3(uniforms.model * vec4(position, 1.0)); 
+
+                    tex_coords = uvs;           
                 }
             ",
     }
@@ -83,6 +87,7 @@ pub mod fs {
                 layout(location = 0) in vec3 fragColor;
                 layout(location = 1) in vec3 in_normal;
                 layout(location = 2) in vec3 frag_pos;
+                layout(location = 3) in vec2 tex_coords;
 
                 layout(location = 0) out vec4 outColor;
 
@@ -95,6 +100,12 @@ pub mod fs {
                     vec3 position;
                     vec3 color;
                 } directional;
+
+                layout(set = 0, binding = 3) uniform sampler2D tex;
+//                layout(set = 0, binding = 3) uniform sampler s;
+
+//                layout(set = 0, binding = 4) uniform texture2D tex;
+
 
                 void main(){
                     // Ambient Light
@@ -109,18 +120,23 @@ pub mod fs {
                     vec3 combined_color = (ambient_color + directional_color)  * fragColor;
 
                     // Final color output
-                    outColor = vec4(combined_color, 1.0);
+//                     outColor = vec4(combined_color, 1.0);
                     //outColor = vec4(fragColor, 1.0);
+
+                    outColor = texture(tex,  tex_coords);
+//                    outColor = texture(sampler2D(tex, s), tex_coords);
                 }
             ",
     }
 }
 
-#[derive(Debug, BufferContents, Copy, Clone, VertexInput)]
+#[derive(Debug, BufferContents, Copy, Clone, VertexInput, Default)]
 #[repr(C)]
 pub struct Vertex {
     #[format(R32G32B32_SFLOAT)]
     pub position: [f32; 3],
     #[format(R32G32B32_SFLOAT)]
     pub normal: [f32; 3],
+    #[format(R32G32_SFLOAT)]
+    pub uvs: [f32; 2],
 }

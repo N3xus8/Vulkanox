@@ -1,31 +1,24 @@
 // Note: Logical Device
 
 use std::{
-    cell::RefCell,
-    sync::{Arc, Mutex},
+    cell::RefCell, io::Cursor, sync::{Arc, Mutex}
 };
 
 use vulkano::{
     buffer::{
         allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
         Buffer, BufferCreateInfo, BufferUsage, Subbuffer,
-    },
-    command_buffer::{
-        allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
-        CopyBufferInfo,
-    },
-    descriptor_set::{
+    }, command_buffer::{
+        self, allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder,
+        CommandBufferUsage, CopyBufferInfo,
+    }, descriptor_set::{
         allocator::{StandardDescriptorSetAllocator, StandardDescriptorSetAllocatorCreateInfo},
         layout::{DescriptorBindingFlags, DescriptorSetLayoutBinding, DescriptorType},
         PersistentDescriptorSet, WriteDescriptorSet,
-    },
-    device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo},
-    format::Format,
-    memory::{
+    }, device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo}, format::Format, image::{sampler::{Filter, SamplerAddressMode, SamplerCreateInfo, SamplerMipmapMode}, view::ImageView, Image, ImageCreateInfo, ImageUsage}, memory::{
         allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
         MemoryPropertyFlags,
-    },
-    pipeline::{
+    }, pipeline::{
         graphics::{
             color_blend::{ColorBlendAttachmentState, ColorBlendState},
             depth_stencil::{DepthState, DepthStencilState},
@@ -39,10 +32,7 @@ use vulkano::{
         },
         layout::PipelineDescriptorSetLayoutCreateInfo,
         DynamicState, GraphicsPipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
-    },
-    shader::ShaderStages,
-    sync::{self, GpuFuture},
-    DeviceSize,
+    }, shader::ShaderStages, sync::{self, GpuFuture}, DeviceSize
 };
 
 use crate::{
@@ -53,6 +43,7 @@ use crate::{
     lighting::{AmbientLight, DirectionalLight, WHITE_AMBIENT_LIGHT},
     mesh::MeshBuilder,
     shader::{self, fs, vs, Vertex},
+    textures::{create_sampler, create_texture},
     vulkan_context::VulkanContext,
     vulkan_instance::VulkanInstance,
 };
@@ -141,7 +132,7 @@ impl VulkanDevice {
 
         // ---->
         //
-        let gltf_mesh = MeshBuilder::read_gltf("assets/Box.gltf")?;
+        let gltf_mesh = MeshBuilder::read_gltf("assets/BoxTextured.gltf")?;
         let vertices = gltf_mesh.vertices()?;
         let indices = gltf_mesh.indices();
         let vertices_length = vertices.len();
@@ -150,7 +141,7 @@ impl VulkanDevice {
         // let indices: Vec<u32> = indices.iter().map(|id| *id as u32).collect();
 
         // Create a Vertex buffer  : subbuffer<[Vertex]>
-
+        println!("{:?}", vertices[2]);
         let vertex_buffer = Buffer::new_slice(
             memory_allocator.clone(),
             BufferCreateInfo {
@@ -240,7 +231,24 @@ impl VulkanDevice {
             let mut instance_writer = instances_staging_buffer.write()?;
             instance_writer.copy_from_slice(&instances);
         }
+        // <----
+        // Textures
+        // ----->
 
+        let mut command_builder = AutoCommandBufferBuilder::primary(
+            &command_allocator,
+            queue_family_index,
+            CommandBufferUsage::OneTimeSubmit,
+        )?;
+
+        let texture = create_texture(
+            "assets/vulkano_logo.png",
+            &mut command_builder,
+            memory_allocator.clone(),
+        )?;
+    
+        let sampler = create_sampler(Arc::clone(&device))?;
+      
         // <----
         // Camera
         // ----->
@@ -287,11 +295,6 @@ impl VulkanDevice {
 
         // command to copy buffer on host to  buffer on device
         // command builder:
-        let mut command_builder = AutoCommandBufferBuilder::primary(
-            &command_allocator,
-            queue_family_index,
-            CommandBufferUsage::OneTimeSubmit,
-        )?;
 
         // build copy command
         command_builder.copy_buffer(CopyBufferInfo::buffers(
@@ -508,6 +511,9 @@ impl VulkanDevice {
                 WriteDescriptorSet::buffer(0, uniform_buffer.clone()),
                 WriteDescriptorSet::buffer(1, ambient_light_subbuffer.clone()),
                 WriteDescriptorSet::buffer(2, directional_lights_subbuffer.clone()),
+//                 WriteDescriptorSet::sampler(3, Arc::clone(&sampler)),
+//                 WriteDescriptorSet::image_view(4, Arc::clone(&texture)),
+               WriteDescriptorSet::image_view_sampler(3, Arc::clone(&texture),Arc::clone(&sampler)),
             ],
             [],
         )?;

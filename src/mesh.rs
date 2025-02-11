@@ -42,7 +42,6 @@ impl MeshBuilder {
 
                 // Positions
                 if let Some(iter) = reader.read_positions() {
-                    
                     println!("VERTICES NUMBER: {:?}", iter.len());
 
                     for vertex_position in iter {
@@ -66,6 +65,7 @@ impl MeshBuilder {
                     iter,
                 ))) = reader.read_tex_coords(0)
                 {
+                    println!("UVS NUMBER: {:?}", iter.len());
                     for texture_coord in iter {
                         uvs.push(texture_coord);
                     }
@@ -100,7 +100,13 @@ impl MeshBuilder {
         } else {
             Some(normals)
         };
-        let uvs = if uvs.is_empty() { warn!("no UV found") ; None } else { info!(" found some UV"); Some(uvs) };
+        let uvs = if uvs.is_empty() {
+            warn!("no UV found");
+            None
+        } else {
+            info!(" found some UV");
+            Some(uvs)
+        };
 
         Ok(MeshBuilder {
             positions,
@@ -119,6 +125,7 @@ impl MeshBuilder {
                     vertices.push(Vertex {
                         position: *position,
                         normal: *normal,
+                        uvs: [0., 0.],
                     });
                 }
             }
@@ -128,8 +135,92 @@ impl MeshBuilder {
                     vertices.push(Vertex {
                         position: *position,
                         normal: [0., 0., 1.],
+                        uvs: [0., 0.],
                     });
                 }
+            }
+        }
+
+        match &self.uvs {
+            Some(uvs) => {
+                for (vertex, uv) in vertices.iter_mut().zip(uvs) {
+                    vertex.uvs = *uv;
+                }
+            }
+
+            None => {
+let uvs = vec!(
+[0.0, 0.0],
+[0.0, 1.0],
+[1.0, 0.0],
+[1.0, 1.0],
+[0.0, 0.0],
+[0.0, 1.0],
+[1.0, 0.0],
+[1.0, 1.0],
+[0.0, 0.0],
+[1.0, 0.0],
+[0.0, 1.0],
+[1.0, 1.0],
+[0.0, 0.0],
+[1.0, 0.0],
+[0.0, 1.0],
+[1.0, 1.0],
+[0.0, 0.0],
+[1.0, 0.0],
+[0.0, 1.0],
+[1.0, 1.0],
+[0.0, 0.0],
+[1.0, 0.0],
+[0.0, 1.0],
+[1.0, 1.0],
+);
+
+/* 
+let uvs = vec!(
+[0.0, 0.0],
+[0.333, 0.0],
+[0.333, 0.333],
+[0.0, 0.333],
+
+// Right face
+[0.333, 0.0],
+[0.666, 0.0],
+[0.666, 0.333],
+[0.333, 0.333],
+
+// Back face
+[0.666, 0.0],
+[1.0, 0.0],
+[1.0, 0.333],
+[0.666, 0.333],
+
+// Left face
+[0.0, 0.333],
+[0.333, 0.333],
+[0.333, 0.666],
+[0.0, 0.666],
+
+// Top face
+[0.333, 0.333],
+[0.333, 0.666],
+[0.666, 0.666],
+[0.666, 0.333],
+
+// Bottom face
+[0.666, 0.333],
+[1.0, 0.333],
+[1.0, 0.666],
+[0.666, 0.666],); */
+
+
+
+for (vertex, uv) in vertices.iter_mut().zip(uvs) {
+    vertex.uvs = uv;
+}
+
+
+                warn!("no uvs found. default: [0,0]");
             }
         }
 

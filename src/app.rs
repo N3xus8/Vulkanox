@@ -16,11 +16,11 @@ use winit::{
 use crate::{
     camera::{Camera, CameraController, MVP},
     error::{self, Result},
+    utils::load_icon,
     vulkan_context::VulkanContext,
     vulkan_device::VulkanDevice,
     vulkan_instance::VulkanInstance,
     vulkan_renderer::VulkanRenderer,
-    utils::load_icon,
 };
 
 pub struct VisualSystem {
@@ -33,7 +33,6 @@ pub struct VisualSystem {
 
 impl VisualSystem {
     pub fn new<T>(window_target: &EventLoopWindowTarget<T>) -> Result<Self> {
-
         let window_icon: Option<winit::window::Icon> = Some(load_icon("./assets/icon.png"));
 
         // Support Multi windows
@@ -148,7 +147,6 @@ impl VisualSystem {
     }
 
     pub fn resize(&mut self, window_id: WindowId, new_size: PhysicalSize<u32>) -> Result<()> {
-
         if !(new_size.width == 0 || new_size.height == 0) {
             self.vulkan_renderers[&window_id]
                 .lock()
@@ -182,8 +180,7 @@ impl VisualSystem {
 
             self.vulkan_device.update_uniform_buffer()?;
 
-        return Ok(()) ;
-
+            return Ok(());
         }
 
         Ok(())

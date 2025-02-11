@@ -17,7 +17,7 @@ pub struct Instance {
 
 impl Instance {
     pub fn new() -> Vec<Instance> {
-        let instances = (0..NUM_INSTANCES_PER_ROW)
+        let instances = (0..(NUM_INSTANCES_PER_ROW.max(1)))
             .flat_map(|y| {
                 (0..NUM_INSTANCES_PER_ROW).map(move |x| {
                     let x = SPACE_BETWEEN * (x as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
