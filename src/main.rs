@@ -17,6 +17,7 @@ mod vulkan_context;
 mod vulkan_device;
 mod vulkan_instance;
 mod vulkan_renderer;
+mod debug_utils;
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt::init();

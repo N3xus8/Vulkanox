@@ -22,8 +22,8 @@ impl VulkanInstance {
     pub fn new(compatible_window: Arc<Window>) -> Result<Self> {
         let library = VulkanLibrary::new()?;
 
-        let required_extensions = Surface::required_extensions(&compatible_window);
-
+        let  required_extensions = Surface::required_extensions(&compatible_window);
+        // For debugging --> required_extensions.ext_debug_utils = true;
         let instance = Instance::new(
             library,
             InstanceCreateInfo {

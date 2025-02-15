@@ -17,6 +17,7 @@ Winit version 0.29.3
 <u>Prerequisites:</u>
 
 Install Vulkan SDK for your platform.
+https://vulkan.lunarg.com/
 
 You will need a C/C++ compiler for shader compilation.
 
@@ -40,5 +41,6 @@ RenderDoc for Vulkan debugging
 + Maintain object aspect ratio when resizing windows.
 + Lighting.
 + Push constants.
++ textures + mipmap.
 
-![alt text](RainbowCubes.png "Cube")
+![alt text](RainbowCubes.png "exploration of cubes")

@@ -381,7 +381,11 @@ impl VulkanRenderer {
         // Vulkan synchronization
         // <------
 
-        //
+        // we need to wait until the operation is complete. 
+        // To do that, we need to program the GPU to send back a special signal that will make us know it has finished. 
+        // This kind of signal is called a fence, and it lets us know whenever the GPU has reached a certain point of execution.
+        
+        // To do that, let's actually save the future and wait for the operations to finish:
         let future = self
             .previous_frame_end
             .take()
@@ -389,14 +393,14 @@ impl VulkanRenderer {
             .join(acquire_future)
             .then_execute(Arc::clone(self.vulkan_device.queue()), command_buffer)
             .unwrap()
-            // The color output is now expected to contain our triangle. But in order to
-            // show it on the screen, we have to *present* the image by calling
+            // The color output is now expected to contain our triangles. But in order to
+            // show then on the screen, we have to *present* the image by calling
             // `then_swapchain_present`.
             //
             // This function does not actually present the image immediately. Instead it
             // submits a present command at the end of the queue. This means that it will
             // only be presented once the GPU has finished executing the command buffer
-            // that draws the triangle.
+            // that draws the triangles.
             .then_swapchain_present(
                 Arc::clone(self.vulkan_device.queue()),
                 SwapchainPresentInfo::swapchain_image_index(
@@ -404,6 +408,7 @@ impl VulkanRenderer {
                     image_index,
                 ),
             )
+            // same as signal fence, and then flush
             .then_signal_fence_and_flush();
 
         match future.map_err(Validated::unwrap) {

@@ -1,24 +1,28 @@
 // Note: Logical Device
 
-use std::{
-    cell::RefCell, io::Cursor, sync::{Arc, Mutex}
-};
+use std::{cell::RefCell, sync::Arc};
 
 use vulkano::{
     buffer::{
         allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
         Buffer, BufferCreateInfo, BufferUsage, Subbuffer,
-    }, command_buffer::{
-        self, allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder,
-        CommandBufferUsage, CopyBufferInfo,
-    }, descriptor_set::{
+    },
+    command_buffer::{
+        allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
+        CopyBufferInfo,
+    },
+    descriptor_set::{
         allocator::{StandardDescriptorSetAllocator, StandardDescriptorSetAllocatorCreateInfo},
-        layout::{DescriptorBindingFlags, DescriptorSetLayoutBinding, DescriptorType},
+        layout::{DescriptorSetLayoutBinding, DescriptorType},
         PersistentDescriptorSet, WriteDescriptorSet,
-    }, device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo}, format::Format, image::{sampler::{Filter, SamplerAddressMode, SamplerCreateInfo, SamplerMipmapMode}, view::ImageView, Image, ImageCreateInfo, ImageUsage}, memory::{
+    },
+    device::{Device, DeviceCreateInfo, Features, Queue, QueueCreateInfo},
+    format::Format,
+    memory::{
         allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
         MemoryPropertyFlags,
-    }, pipeline::{
+    },
+    pipeline::{
         graphics::{
             color_blend::{ColorBlendAttachmentState, ColorBlendState},
             depth_stencil::{DepthState, DepthStencilState},
@@ -32,7 +36,10 @@ use vulkano::{
         },
         layout::PipelineDescriptorSetLayoutCreateInfo,
         DynamicState, GraphicsPipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
-    }, shader::ShaderStages, sync::{self, GpuFuture}, DeviceSize
+    },
+    shader::ShaderStages,
+    sync::{self, GpuFuture},
+    DeviceSize,
 };
 
 use crate::{
@@ -141,7 +148,7 @@ impl VulkanDevice {
         // let indices: Vec<u32> = indices.iter().map(|id| *id as u32).collect();
 
         // Create a Vertex buffer  : subbuffer<[Vertex]>
-        println!("{:?}", vertices[2]);
+
         let vertex_buffer = Buffer::new_slice(
             memory_allocator.clone(),
             BufferCreateInfo {
@@ -242,13 +249,13 @@ impl VulkanDevice {
         )?;
 
         let texture = create_texture(
-            "assets/vulkano_logo.png",
+            "assets/Vulkano_logo.png",
             &mut command_builder,
             memory_allocator.clone(),
         )?;
-    
+
         let sampler = create_sampler(Arc::clone(&device))?;
-      
+
         // <----
         // Camera
         // ----->
@@ -342,7 +349,7 @@ impl VulkanDevice {
 
         //  Lights
 
-        // Ambient Light
+        // Ambient Light *💡**
 
         let ambient_light = WHITE_AMBIENT_LIGHT;
         //let ambient_light = AmbientLight { color: [0.0, 0.5 , 0.5], intensity: 0.7};
@@ -353,8 +360,8 @@ impl VulkanDevice {
         // Directional Light
 
         let directional_light = DirectionalLight {
-            position: [0., 0.2, 1.5],
-            color: [0.2, 0.7, 0.3],
+            position: [1.2, 1.2, 1.9].into(), // Padding for alignment . super tricky to flag. thanks Renderdoc
+            color: [1., 0.2, 0.3],
         };
 
         //let directional_light = vec![directional_light.clone()];
@@ -511,9 +518,11 @@ impl VulkanDevice {
                 WriteDescriptorSet::buffer(0, uniform_buffer.clone()),
                 WriteDescriptorSet::buffer(1, ambient_light_subbuffer.clone()),
                 WriteDescriptorSet::buffer(2, directional_lights_subbuffer.clone()),
-//                 WriteDescriptorSet::sampler(3, Arc::clone(&sampler)),
-//                 WriteDescriptorSet::image_view(4, Arc::clone(&texture)),
-               WriteDescriptorSet::image_view_sampler(3, Arc::clone(&texture),Arc::clone(&sampler)),
+                WriteDescriptorSet::image_view_sampler(
+                    3,
+                    Arc::clone(&texture),
+                    Arc::clone(&sampler),
+                ),
             ],
             [],
         )?;

@@ -5,24 +5,29 @@ use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
 use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, BlitImageInfo, BufferImageCopy, ClearColorImageInfo,
-    CommandBufferUsage, CopyBufferToImageInfo, CopyImageInfo, ImageBlit, ImageCopy,
+     CopyBufferToImageInfo, CopyImageInfo, ImageBlit, ImageCopy,
     PrimaryAutoCommandBuffer,
 };
-use vulkano::device::{Device, Queue};
+use vulkano::device::Device;
 use vulkano::format::Format;
 use vulkano::image::sampler::{
     Filter, Sampler, SamplerAddressMode, SamplerCreateInfo, SamplerMipmapMode,
 };
 use vulkano::image::view::ImageView;
 use vulkano::image::{
-    Image, ImageAspects, ImageCreateInfo, ImageLayout, ImageSubresourceLayers, ImageType,
+    Image, ImageAspects, ImageCreateInfo, ImageLayout, ImageSubresourceLayers,
     ImageUsage,
 };
 use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator};
 use vulkano::DeviceSize;
 
+use crate::debug_utils::{self, debug_label};
 use crate::{error::Result, utils::read_file_to_bytes};
+use vulkano::instance::debug::DebugUtilsLabel;
 
+// Function
+// 1. takes a path to a png image and returns a ImageView (texture).
+// 2. takes in an existing command buffer builder and add the blit image commands
 pub fn create_texture(
     path: &str,
     command_builder: &mut AutoCommandBufferBuilder<
@@ -48,7 +53,7 @@ pub fn create_texture(
 
         let img_size = [info.width, info.height];
         // These are the image dimensions we’ll pass along to Vulkan when we create the texture.
-        let extent = [info.width  , info.height , 1];
+        let extent = [info.width * 2, info.height * 2, 1]; // make the image twice as big in order to blit full image into it. Basically you can put the same image 4 time 2x2
 
         let mut mip_width = info.width;
         let mut mip_height = info.height;
@@ -71,7 +76,7 @@ pub fn create_texture(
             png::BitDepth::Eight => 8,
             png::BitDepth::Sixteen => 16,
         };
-
+        // Buffer for the picture
         let upload_buffer = Buffer::new_slice(
             memory_allocator.clone(),
             BufferCreateInfo {
@@ -99,37 +104,45 @@ pub fn create_texture(
             },
             AllocationCreateInfo::default(),
         )?;
-        command_builder
-                // Clear the image buffer.
-                .clear_color_image(ClearColorImageInfo::image(image.clone()))
-                .unwrap()
-                // Put our image in the top left corner.
-                .copy_buffer_to_image(CopyBufferToImageInfo {
-                    regions: [BufferImageCopy {
-                        image_subresource: image.subresource_layers(),
-                        image_extent: [img_size[0], img_size[1], 1],
-                        ..Default::default()
-                    }]
-                    .into(),
-                    ..CopyBufferToImageInfo::buffer_image(upload_buffer, image.clone()) // upload Image here
-                })?;
-                // Copy from the top left corner to the bottom right corner.
-/*                 .copy_image(CopyImageInfo {
-                    // Copying within the same image requires the General layout if the source and
-                    // destination subresources overlap.
-                    src_image_layout: ImageLayout::General,
-                    dst_image_layout: ImageLayout::General,
-                    regions: [ImageCopy {
-                        src_subresource: image.subresource_layers(),
-                        src_offset: [0, 0, 0],
-                        dst_subresource: image.subresource_layers(),
-                        dst_offset: [img_size[0], img_size[1], 0],
-                        extent: [img_size[0], img_size[1], 1],
-                        ..Default::default()
-                    }]
-                    .into(),
-                    ..CopyImageInfo::images(image.clone(), image.clone())
-                })?; */
+        
+         command_builder
+                    // In order for debug label to work need to set instance : required_extensions.ext_debug_utils = true; first
+                    //  .begin_debug_utils_label(debug_utils::debug_label!("Texture copy"))? 
+            // Clear the image buffer.
+            .clear_color_image(ClearColorImageInfo::image(image.clone()))
+            .unwrap()
+            // Put our image in the top left corner.
+            .copy_buffer_to_image(CopyBufferToImageInfo {
+                regions: [BufferImageCopy {
+                    image_subresource: image.subresource_layers(),
+                    image_extent: [img_size[0], img_size[1], 1],
+                    ..Default::default()
+                }]
+                .into(),
+                ..CopyBufferToImageInfo::buffer_image(upload_buffer, image.clone()) // upload Image here
+            })?
+                    //.insert_debug_utils_label(debug_label!("Copy within same image"))? // See comment above.
+            // Copy from the top left corner to the bottom right corner.
+            .copy_image(CopyImageInfo {
+                // Copying within the same image requires the General layout if the source and
+                // destination subresources overlap.
+                src_image_layout: ImageLayout::General,
+                dst_image_layout: ImageLayout::General,
+                regions: [ImageCopy {
+                    src_subresource: image.subresource_layers(),
+                    src_offset: [0, 0, 0],
+                    dst_subresource: image.subresource_layers(),
+                    dst_offset: [img_size[0], img_size[1], 0],
+                    extent: [img_size[0], img_size[1], 1],
+                    ..Default::default()
+                }]
+                .into(),
+                ..CopyImageInfo::images(image.clone(), image.clone())
+                
+            })?; 
+            //
+            // .end_debug_utils_label() }?; // This needs unsafe block.
+            //  
         // MIPMAP
         for level in 1..mip_levels {
             let src_subresource = ImageSubresourceLayers {
@@ -153,7 +166,9 @@ pub fn create_texture(
                     1,
                 ],
             ];
-            println!("DEBUG --> src: {:?} ; dst {:?}", src_offsets, dst_offsets);
+
+            // println!("Debug --> src offset: {:?} ; dst offset: {:?}",src_offsets , dst_offsets);
+
             let blit = ImageBlit {
                 src_subresource,
                 src_offsets,
@@ -163,14 +178,13 @@ pub fn create_texture(
             };
 
             // Here, we perform image copying and blitting on the same image.
-            command_builder
-                .blit_image(BlitImageInfo {
-                    src_image_layout: ImageLayout::TransferSrcOptimal,
-                    dst_image_layout: ImageLayout::TransferDstOptimal,
-                    regions: [blit].into(),
-                    filter: Filter::Linear,
-                    ..BlitImageInfo::images(image.clone(), image.clone())
-                })?;
+            command_builder.blit_image(BlitImageInfo {
+                src_image_layout: ImageLayout::TransferSrcOptimal,
+                dst_image_layout: ImageLayout::TransferDstOptimal,
+                regions: [blit].into(),
+                filter: Filter::Linear,
+                ..BlitImageInfo::images(image.clone(), image.clone())
+            })?;
 
             if mip_width > 1 {
                 mip_width /= 2;

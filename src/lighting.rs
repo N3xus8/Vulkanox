@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use bytemuck::{Pod, Zeroable};
 use vulkano::{
-    buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
+    buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer},
     memory::allocator::{
         AllocationCreateInfo, FreeListAllocator, GenericMemoryAllocator, MemoryTypeFilter,
-    },
+    }, padded::Padded,
 };
 
 use crate::error::Result;
@@ -46,9 +46,9 @@ pub const WHITE_AMBIENT_LIGHT: AmbientLight = AmbientLight {
 };
 
 #[repr(C)]
-#[derive(Default, Debug, Copy, Clone, Pod, Zeroable)]
+#[derive(Default, Debug, Copy, Clone,BufferContents)]
 pub struct DirectionalLight {
-    pub position: [f32; 3],
+    pub position: Padded<[f32; 3], 4>,
     pub color: [f32; 3],
 }
 

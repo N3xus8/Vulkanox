@@ -17,14 +17,14 @@ pub struct Instance {
 
 impl Instance {
     pub fn new() -> Vec<Instance> {
-        let instances = (0..(NUM_INSTANCES_PER_ROW.max(1)))
+        (0..(NUM_INSTANCES_PER_ROW.max(1)))
             .flat_map(|y| {
                 (0..NUM_INSTANCES_PER_ROW).map(move |x| {
                     let x = SPACE_BETWEEN * (x as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
                     let y = SPACE_BETWEEN * (y as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
 
                     let position: Vector3<f32> =
-                        Vector3::new(x as f32, y as f32, 0.0) - INSTANCE_DISPLACEMENT;
+                        Vector3::new(x , y , 0.0) - INSTANCE_DISPLACEMENT;
 
                     let rotation = if position == Vector3::zeros() {
                         // this is needed so an object at (0, 0, 0) won't get scaled to zero
@@ -37,9 +37,9 @@ impl Instance {
                     Instance { position, rotation }
                 })
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
 
-        instances
+        
     }
 }
 

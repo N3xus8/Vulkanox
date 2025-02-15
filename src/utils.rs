@@ -1,6 +1,5 @@
 use std::{fs::File, io::Read};
 
-use image::{ImageBuffer, Rgba};
 use winit::window::Icon;
 
 pub fn load_icon(path: &str) -> Icon {

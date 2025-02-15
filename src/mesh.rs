@@ -1,10 +1,10 @@
-use std::iter::zip;
 
 use gltf::Gltf;
 use tracing::{info, warn};
 
 use crate::error::Result;
 use crate::shader::Vertex;
+// Struct to read GLTF and store Mesh data
 pub struct MeshBuilder {
     positions: Vec<[f32; 3]>,
     indices: Vec<u16>,
@@ -141,6 +141,7 @@ impl MeshBuilder {
             }
         }
 
+        // The UVS part is a bit hacky. Note: the Vertex struct has a default and the UVs by default will be [0.0, 0.0]
         match &self.uvs {
             Some(uvs) => {
                 for (vertex, uv) in vertices.iter_mut().zip(uvs) {
@@ -149,78 +150,41 @@ impl MeshBuilder {
             }
 
             None => {
-let uvs = vec!(
-[0.0, 0.0],
-[0.0, 1.0],
-[1.0, 0.0],
-[1.0, 1.0],
-[0.0, 0.0],
-[0.0, 1.0],
-[1.0, 0.0],
-[1.0, 1.0],
-[0.0, 0.0],
-[1.0, 0.0],
-[0.0, 1.0],
-[1.0, 1.0],
-[0.0, 0.0],
-[1.0, 0.0],
-[0.0, 1.0],
-[1.0, 1.0],
-[0.0, 0.0],
-[1.0, 0.0],
-[0.0, 1.0],
-[1.0, 1.0],
-[0.0, 0.0],
-[1.0, 0.0],
-[0.0, 1.0],
-[1.0, 1.0],
-);
 
-/* 
-let uvs = vec!(
-[0.0, 0.0],
-[0.333, 0.0],
-[0.333, 0.333],
-[0.0, 0.333],
-
-// Right face
-[0.333, 0.0],
-[0.666, 0.0],
-[0.666, 0.333],
-[0.333, 0.333],
-
-// Back face
-[0.666, 0.0],
-[1.0, 0.0],
-[1.0, 0.333],
-[0.666, 0.333],
-
-// Left face
-[0.0, 0.333],
-[0.333, 0.333],
-[0.333, 0.666],
-[0.0, 0.666],
-
-// Top face
-[0.333, 0.333],
-[0.333, 0.666],
-[0.666, 0.666],
-[0.666, 0.333],
-
-// Bottom face
-[0.666, 0.333],
-[1.0, 0.333],
-[1.0, 0.666],
-[0.666, 0.666],); */
+                // Hack workaround for missing uv . only works for cube
+                let uvs = vec![
+                    [0.0, 0.0],
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    [1.0, 1.0],
+                    [0.0, 0.0],
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    [1.0, 1.0],
+                    [0.0, 0.0],
+                    [1.0, 0.0],
+                    [0.0, 1.0],
+                    [1.0, 1.0],
+                    [0.0, 0.0],
+                    [1.0, 0.0],
+                    [0.0, 1.0],
+                    [1.0, 1.0],
+                    [0.0, 0.0],
+                    [1.0, 0.0],
+                    [0.0, 1.0],
+                    [1.0, 1.0],
+                    [0.0, 0.0],
+                    [1.0, 0.0],
+                    [0.0, 1.0],
+                    [1.0, 1.0],
+                ];
 
 
+                for (vertex, uv) in vertices.iter_mut().zip(uvs) {
+                    vertex.uvs = uv;
+                }
 
-for (vertex, uv) in vertices.iter_mut().zip(uvs) {
-    vertex.uvs = uv;
-}
-
-
-                warn!("no uvs found. default: [0,0]");
+                warn!("no uvs found. default.");
             }
         }
 

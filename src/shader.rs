@@ -120,11 +120,12 @@ pub mod fs {
                     vec3 combined_color = (ambient_color + directional_color)  * fragColor;
 
                     // Final color output
-//                     outColor = vec4(combined_color, 1.0);
+                   vec4   outColorL = vec4((ambient_color + directional_color), 1.0);
                     //outColor = vec4(fragColor, 1.0);
 
-                    outColor = texture(tex,  tex_coords);
-//                    outColor = texture(sampler2D(tex, s), tex_coords);
+                    vec4 outColorT = texture(tex,  tex_coords);
+//                    outColort = texture(sampler2D(tex, s), tex_coords);
+                    outColor = outColorT * outColorL;
                 }
             ",
     }
