@@ -30,6 +30,7 @@ impl VulkanContext {
         })
     }
 
+    #[allow(unused)]
     pub fn camera(&self) -> &Arc<Mutex<Camera>> {
         &self.camera
     }

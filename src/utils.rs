@@ -10,6 +10,7 @@ pub fn load_icon(path: &str) -> Icon {
 }
 
 // Color correction. needed for web browser
+#[allow(unused)]
 pub fn linear_to_srgb(linear: f64) -> f64 {
     if linear <= 0.0031308 {
         linear * 12.92

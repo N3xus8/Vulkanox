@@ -130,7 +130,7 @@ impl VulkanDevice {
         ));
 
         //<----
-        // Decriptor set Allocator
+        // Descriptor set Allocator
         //---->
         let descriptor_set_allocator = Arc::new(StandardDescriptorSetAllocator::new(
             Arc::clone(&device),
@@ -549,6 +549,7 @@ impl VulkanDevice {
         &self.queue
     }
 
+    #[allow(unused)]
     pub fn memory_allocator(&self) -> &Arc<StandardMemoryAllocator> {
         &self.memory_allocator
     }
@@ -568,10 +569,9 @@ impl VulkanDevice {
     pub fn descriptor_set(&self) -> &Arc<PersistentDescriptorSet> {
         &self.descriptor_set
     }
-
-    pub fn vulkan_context(&self) -> &Arc<VulkanContext> {
+/*     pub fn vulkan_context(&self) -> &Arc<VulkanContext> {
         &self.vulkan_context()
-    }
+    } */
 
     pub fn update_uniform_buffer(&self) -> Result<()> {
         *self.uniform_staging_buffer.write()? =

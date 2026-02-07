@@ -21,9 +21,7 @@ use vulkano::image::{
 use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator};
 use vulkano::DeviceSize;
 
-use crate::debug_utils::{self, debug_label};
 use crate::{error::Result, utils::read_file_to_bytes};
-use vulkano::instance::debug::DebugUtilsLabel;
 
 // Function
 // 1. takes a path to a png image and returns a ImageView (texture).
@@ -38,6 +36,7 @@ pub fn create_texture(
 ) -> Result<Arc<ImageView>> {
     // load the image data and dimensions before event loop
     let texture = {
+        
         //  to read in the texture file as bytes
         let png_bytes = read_file_to_bytes(path);
         // Cursor wraps a byte array to provide an implementation of the Read trait.
