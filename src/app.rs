@@ -1,7 +1,5 @@
 use std::{
-    cell::RefCell,
-    collections::BTreeMap,
-    sync::{Arc, Mutex},
+    cell::RefCell, collections::BTreeMap, rc::Rc, sync::{Arc, Mutex}
 };
 
 use tracing::info;
@@ -14,7 +12,7 @@ use winit::{
 };
 
 use crate::{
-    camera::{Camera, CameraController, MVP},
+    camera::{Camera, CameraController, Mvp},
     error::{self, Result},
     utils::load_icon,
     vulkan_context::VulkanContext,
@@ -26,9 +24,10 @@ use crate::{
 pub struct VisualSystem {
     primary_window_id: WindowId,
     windows: BTreeMap<WindowId, Arc<Window>>,
+    #[allow(unused)]
     vulkan_instance: Arc<VulkanInstance>,
-    vulkan_device: Arc<VulkanDevice>,
-    vulkan_renderers: BTreeMap<WindowId, Arc<Mutex<VulkanRenderer>>>,
+    vulkan_device: Rc<VulkanDevice>,
+    vulkan_renderers: BTreeMap<WindowId, Rc<Mutex<VulkanRenderer>>>,
 }
 
 impl VisualSystem {
@@ -54,7 +53,7 @@ impl VisualSystem {
 
         let camera_controller = Arc::new(Mutex::new(CameraController::new(0.2)));
 
-        let mut mvp_uniform = MVP::new();
+        let mut mvp_uniform = Mvp::new();
         mvp_uniform.update_view(&camera.lock().unwrap());
         mvp_uniform.update_projection(&camera.lock().unwrap());
 
@@ -62,15 +61,15 @@ impl VisualSystem {
 
         let samples = SampleCount::Sample4;
 
-        let vulkan_context = Arc::new(RefCell::new(VulkanContext::new(
+        let vulkan_context = Rc::new(RefCell::new(VulkanContext::new(
             camera,
             Arc::new(Mutex::new(mvp_uniform)),
             camera_controller,
             samples,
         )?));
 
-        let vulkan_device = Arc::new(
-            VulkanDevice::new(Arc::clone(&vulkan_instance), Arc::clone(&vulkan_context))
+        let vulkan_device = Rc::new(
+            VulkanDevice::new(Arc::clone(&vulkan_instance), Rc::clone(&vulkan_context))
                 .map_err(|_| error::VisualSystemError::ErrorCreatingVulkanDevice)?,
         );
 
@@ -79,7 +78,7 @@ impl VisualSystem {
 
         let symbol_list = "♔♕♖♗♘♙☚★";
 
-        for idx in 0..0 {
+        for idx in 0..1 {
             let char_at_index = symbol_list
                 .chars()
                 .nth(idx % (symbol_list.chars().count()))
@@ -99,9 +98,9 @@ impl VisualSystem {
         for (window_id, window) in &windows {
             vulkan_renderers.insert(
                 *window_id,
-                Arc::new(Mutex::new(
+                Rc::new(Mutex::new(
                     VulkanRenderer::new(
-                        Arc::clone(&vulkan_device),
+                        Rc::clone(&vulkan_device),
                         Arc::clone(window),
                         ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSFER_DST,
                     )
@@ -128,10 +127,10 @@ impl VisualSystem {
         for (window_id, window) in &self.windows {
             self.vulkan_renderers.insert(
                 *window_id,
-                Arc::new(Mutex::new(
+                Rc::new(Mutex::new(
                     VulkanRenderer::new(
                         // Use Mutex fo interior mutability
-                        Arc::clone(&self.vulkan_device),
+                        Rc::clone(&self.vulkan_device),
                         Arc::clone(window),
                         ImageUsage::COLOR_ATTACHMENT,
                     )
@@ -276,7 +275,7 @@ impl App {
             .suspend();
     }
 
-    pub fn process_event<T>(
+    pub fn process_event(
         &mut self,
         event: Event<()>,
         window_target: &EventLoopWindowTarget<()>,

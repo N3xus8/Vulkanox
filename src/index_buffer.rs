@@ -11,7 +11,7 @@ use vulkano::{
     },
     DeviceSize,
 };
-
+#[allow(clippy::type_complexity)]
 pub fn setup_index_buffers(
     indices: Vec<u16>,
     memory_allocator: Arc<GenericMemoryAllocator<FreeListAllocator>>,

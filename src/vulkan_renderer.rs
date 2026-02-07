@@ -1,6 +1,6 @@
 // Note: Renderer
 
-use std::{sync::Arc, time::Instant};
+use std::{rc::Rc, sync::Arc, time::Instant};
 
 use palette::Srgba;
 use vulkano::{
@@ -25,7 +25,7 @@ use winit::window::Window;
 use crate::{error::Result, shader::vs, vulkan_device::VulkanDevice};
 
 pub struct VulkanRenderer {
-    pub vulkan_device: Arc<VulkanDevice>,
+    pub vulkan_device: Rc<VulkanDevice>,
     pub window: Arc<Window>,
     pub swapchain: Arc<Swapchain>,
     pub swapchain_images: Vec<Arc<Image>>,
@@ -38,7 +38,7 @@ pub struct VulkanRenderer {
 
 impl VulkanRenderer {
     pub fn new(
-        vulkan_device: Arc<VulkanDevice>,
+        vulkan_device: Rc<VulkanDevice>,
         window: Arc<Window>,
         image_usage: ImageUsage,
     ) -> Result<Self> {

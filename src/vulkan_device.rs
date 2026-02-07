@@ -1,6 +1,6 @@
 // Note: Logical Device
 
-use std::{cell::RefCell, sync::Arc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use vulkano::{
     buffer::{
@@ -43,7 +43,7 @@ use vulkano::{
 };
 
 use crate::{
-    camera::MVP,
+    camera::Mvp,
     error::Result,
     index_buffer::setup_index_buffers,
     instance_buffer::{self, Instance, InstanceRaw},
@@ -64,15 +64,15 @@ pub struct VulkanDevice {
     pub instance_buffer: Subbuffer<[InstanceRaw]>,
     pub index_buffer: Option<Subbuffer<[u32]>>,
     pub descriptor_set: Arc<PersistentDescriptorSet>,
-    pub vulkan_context: Arc<RefCell<VulkanContext>>,
-    pub uniform_staging_buffer: Subbuffer<MVP>,
-    pub uniform_buffer: Subbuffer<MVP>,
+    pub vulkan_context: Rc<RefCell<VulkanContext>>,
+    pub uniform_staging_buffer: Subbuffer<Mvp>,
+    pub uniform_buffer: Subbuffer<Mvp>,
 }
 
 impl VulkanDevice {
     pub fn new(
         instance: Arc<VulkanInstance>,
-        vulkan_context: Arc<RefCell<VulkanContext>>,
+        vulkan_context: Rc<RefCell<VulkanContext>>,
     ) -> Result<Self> {
         let physical_device = instance.physical_device();
         let queue_family_index = instance.queue_family_index();
@@ -291,11 +291,11 @@ impl VulkanDevice {
         // let uniform_buffer: Subbuffer<CameraUniform> =
         //     uniform_buffer_allocator.allocate_sized().unwrap();
 
-        let uniform_staging_buffer: Subbuffer<MVP> =
+        let uniform_staging_buffer: Subbuffer<Mvp> =
             uniform_staging_buffer_allocator.allocate_sized()?;
         *uniform_staging_buffer.write()? = *mvp_uniform.lock().unwrap();
 
-        let uniform_buffer: Subbuffer<MVP> = uniform_buffer_allocator.allocate_sized().unwrap();
+        let uniform_buffer: Subbuffer<Mvp> = uniform_buffer_allocator.allocate_sized().unwrap();
         // ---->
         // Staging buffers to Device buffers
         // <-----

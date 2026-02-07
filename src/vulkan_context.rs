@@ -4,13 +4,13 @@ use vulkano::image::SampleCount;
 use winit::event::WindowEvent;
 
 use crate::{
-    camera::{Camera, CameraController, MVP},
+    camera::{Camera, CameraController, Mvp},
     error::Result,
 };
 
 pub struct VulkanContext {
     pub camera: Arc<Mutex<Camera>>,
-    pub mvp_uniform: Arc<Mutex<MVP>>,
+    pub mvp_uniform: Arc<Mutex<Mvp>>,
     pub camera_controller: Arc<Mutex<CameraController>>,
     pub samples: SampleCount,
 }
@@ -18,7 +18,7 @@ pub struct VulkanContext {
 impl VulkanContext {
     pub fn new(
         camera: Arc<Mutex<Camera>>,
-        mvp_uniform: Arc<Mutex<MVP>>,
+        mvp_uniform: Arc<Mutex<Mvp>>,
         camera_controller: Arc<Mutex<CameraController>>,
         samples: SampleCount,
     ) -> Result<Self> {
@@ -35,7 +35,7 @@ impl VulkanContext {
         &self.camera
     }
 
-    pub fn mvp_uniform(&self) -> &Arc<Mutex<MVP>> {
+    pub fn mvp_uniform(&self) -> &Arc<Mutex<Mvp>> {
         &self.mvp_uniform
     }
 

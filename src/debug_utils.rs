@@ -1,5 +1,7 @@
+#[allow(unused)]
 use vulkano::instance::debug::DebugUtilsLabel;
 
+#[allow(unused)]
 macro_rules! debug_label {
     ($label_name:expr) => {
         DebugUtilsLabel {
@@ -8,5 +10,6 @@ macro_rules! debug_label {
             ..Default::default()
         }
     };
-}
+}   
+    #[allow(unused_imports)]
     pub(crate) use debug_label ;

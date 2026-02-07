@@ -27,7 +27,7 @@ fn main() -> Result<()> {
     let mut app = App::new(&event_loop)?;
 
     event_loop
-        .run(move |event, window_target| app.process_event::<()>(event, window_target).unwrap())?;
+        .run(move |event, window_target| app.process_event(event, window_target).unwrap())?;
 
     Ok(())
 }

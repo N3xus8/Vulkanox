@@ -36,6 +36,7 @@ pub struct Camera {
 }
 
 impl Camera {
+    #[allow(unused)]
     pub fn new(
         // position the camera 1 unit up and 2 units back
         // +z is out of the screen
@@ -102,17 +103,19 @@ impl Default for Camera {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
+#[allow(unused)]
 pub struct CameraUniform {
     pub view_projection: [[f32; 4]; 4],
 }
 
 impl CameraUniform {
+    #[allow(unused)]
     pub fn new() -> Self {
         Self {
             view_projection: Matrix4::identity().into(),
         }
     }
-
+    #[allow(unused)]
     pub fn update_view_proj(&mut self, camera: &Camera) {
         self.view_projection = camera.build_view_projection_matrix().into();
     }
@@ -208,15 +211,15 @@ impl CameraController {
 // MVP (Model-View-Projection)
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
-pub struct MVP {
+pub struct Mvp {
     model: [[f32; 4]; 4],
     view: [[f32; 4]; 4],
     projection: [[f32; 4]; 4],
 }
 
-impl MVP {
-    pub fn new() -> MVP {
-        MVP {
+impl Mvp {
+    pub fn new() -> Mvp {
+        Mvp {
             model: Matrix4::identity().into(),
             view: Matrix4::identity().into(),
             projection: Matrix4::identity().into(),
