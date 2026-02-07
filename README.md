@@ -43,4 +43,4 @@ RenderDoc for Vulkan debugging
 + Push constants.
 + textures + mipmap.
 
-![alt text](RainbowCubes.png "exploration of cubes")
+!["exploration of cubes"](RainbowCubes.png )
